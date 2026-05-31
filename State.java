@@ -1,5 +1,7 @@
 public enum State{
     SAFE,
     INFECTED,
-    RECOVERED;
+    RECOVERED,
+    DEAD,
+    EXPOSED;
 }
