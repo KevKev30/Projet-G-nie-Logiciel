@@ -5,41 +5,45 @@ import java.util.List;
 import java.util.Map;
 
 public class Graph{
-    private Map<String, Grid> zones;
+    private Map<String, Region> regions;
     private Map<String, List<String>> adjacency;
 
-    public Graph(){
-        this.zones = new HashMap<>();
+    public Graph() {
+        this.regions = new HashMap<>();
         this.adjacency = new HashMap<>();
     }
 
     /**
-     * Adds an area to the graph
-     * @param name name of the area
-     * @param grid the grid associated to this area
+     * Adds a complete region node to the graph.
      */
-    public void addZone(String name, Grid grid){
-        zones.put(name, grid);
-        adjacency.put(name, new ArrayList<>());
+    public void addRegion(Region region) {
+        regions.put(region.getName(), region);
+        adjacency.put(region.getName(), new ArrayList<>());
     }
 
     /**
-     * Links two areas (bidirectional connexion)
+     * Links two regions together (bidirectional/undirected edge).
      */
-    public void addEdge(String zone1, String zone2) {
-        adjacency.get(zone1).add(zone2);
-        adjacency.get(zone2).add(zone1);
+    public void addEdge(String region1, String region2) {
+        if (adjacency.containsKey(region1) && adjacency.containsKey(region2)) {
+            if (!adjacency.get(region1).contains(region2)) {
+                adjacency.get(region1).add(region2);
+            }
+            if (!adjacency.get(region2).contains(region1)) {
+                adjacency.get(region2).add(region1);
+            }
+        }
     }
 
-    public List<String> getNeighborZones(String zone) {
-        return adjacency.getOrDefault(zone, new ArrayList<>());
+    public List<String> getNeighborRegions(String regionName) {
+        return adjacency.getOrDefault(regionName, new ArrayList<>());
     }
 
-    public Grid getGrid(String zone) {
-        return zones.get(zone);
+    public Region getRegion(String regionName) {
+        return regions.get(regionName);
     }
 
-    public Map<String, Grid> getZones() { 
-        return zones;
+    public Map<String, Region> getRegions() {
+        return regions;
     }
 }
