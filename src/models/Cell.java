@@ -1,3 +1,4 @@
+package models;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +20,9 @@ public class Cell{
      * @param speed the movement speed of the cell
      * @param radius the radius of the cell
      * @param weakness a multiplier that increase or decrease the speed of the cell
+     * @param x the position x of the cell
+     * @param y the position y of the cell
+     * @param neighbors the neighbors of the cell
      */
     public Cell(int age, State state, double speed, int radius, double weakness, int x, int y){
         this.age = age;
