@@ -1,40 +1,60 @@
-import models.Graph;
-import models.Grid;
-import models.Region;
+import java.util.List;
+import models.entities.City;
+import models.entities.Region;
+import models.entities.Route;
+import models.graph.NationalGraph;
+import models.graph.RegionalGraph;
+import models.types.AccessState;
+import models.types.Color;
 
 public class Main {
     public static void main(String[] args) {
+        System.out.println("DEBUT DU TEST DE L'ARCHITECTURE DES GRAPHES");
 
-        Graph franceMap = new Graph();
+        NationalGraph nationalGraph = new NationalGraph();
+        Region idf = new Region("Île-de-France");
+        nationalGraph.addRegion(idf);
+        System.out.println("Region ajoutee : " + idf.getName());
 
-        Region idf = new Region("Ile-de-France", 10, 10);
-        Region normandie = new Region("Normandie", 10, 10);
-        Region hautsDeFrance = new Region("Hauts-de-France", 10, 10);
+        RegionalGraph idfGraph = idf.getRegionalGraph();
+        City cergy = new City("Cergy", 10000, 0, 0, 0, Color.GREEN);
+        City pontoise = new City("Pontoise", 4500, 0, 500, 0, Color.GREEN);
+        City versailles = new City("Versailles", 20000, 0, 0, 0, Color.GREEN);
 
-        franceMap.addRegion(idf);
-        franceMap.addRegion(normandie);
-        franceMap.addRegion(hautsDeFrance);
+        idfGraph.addCity(cergy);
+        idfGraph.addCity(pontoise);
+        idfGraph.addCity(versailles);
 
-        franceMap.addEdge("Ile-de-France", "Normandie");
-        franceMap.addEdge("Ile-de-France", "Hauts-de-France");
+        idfGraph.addBiRoute(cergy, pontoise, 0.9);
+        idfGraph.addBiRoute(cergy, versailles, 0.4);
 
-        Grid idfGrid = idf.getCellGrid();
-        for (int i = 0; i < 20; i++) {
-            idfGrid.infectCell(i % 10, i / 10);
+        List<Route> routesDeCergy = idfGraph.getRoutesForCity("Cergy");
+        System.out.println("Routes pour Cergy : " + routesDeCergy.size());
+        
+        for (Route r : routesDeCergy) {
+            System.out.println("Liaison : " + r.getCityA().getName() + " - " + r.getCityB().getName() + " | Etat : " + r.getAccess().getAccessState());
         }
 
-        for (Region r : franceMap.getRegions().values()) {
-            r.updateMacroMetrics();
-        }
+        System.out.println("Taux infection Pontoise initial : " + (pontoise.getInfectionRate() * 100) + "%");
+        pontoise.updateColor();
+        System.out.println("Couleur Pontoise initiale : " + pontoise.getRiskColor().getColor());
 
-        System.out.println("\n--- Region Dashboard View ---");
-        for (Region r : franceMap.getRegions().values()) {
-            System.out.println("Region Name: " + r.getName());
-            System.out.println("  > Infection Rate: " + String.format("%.2f", r.getLocalInfectionRate() * 100) + "%");
-            System.out.println("  > Risk Color Code: " + r.getRiskColor());
-        }
+        pontoise.setInfected(1500);
+        pontoise.setSafe(3500);
+        pontoise.updateColor();
+        System.out.println("Nouveau taux infection Pontoise : " + (pontoise.getInfectionRate() * 100) + "%");
+        System.out.println("Nouvelle couleur Pontoise : " + pontoise.getRiskColor().getColor());
 
-        System.out.println("\nTopology Check:");
-        System.out.println("Neighbors of Ile-de-France: " + franceMap.getNeighborRegions("Ile-de-France"));
+        System.out.println("Couleur initiale IDF : " + idf.getRiskColor().getColor());
+        idf.totalInfectedGraph();
+        System.out.println("Total infectes IDF : " + idf.getTotalInfected());
+        System.out.println("Nouvelle couleur IDF : " + idf.getRiskColor().getColor());
+
+        Route axeCergyPontoise = routesDeCergy.get(0);
+        System.out.println("Etat axe initial : " + axeCergyPontoise.getAccess().getAccessState());
+        axeCergyPontoise.setAccess(AccessState.BARRICATED);
+        System.out.println("Nouvel etat axe : " + axeCergyPontoise.getAccess().getAccessState());
+
+        System.out.println("FIN DES TESTS DE STRUCTURE");
     }
 }
