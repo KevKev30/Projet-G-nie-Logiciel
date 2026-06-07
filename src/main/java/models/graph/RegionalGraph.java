@@ -1,11 +1,12 @@
-package models.graph;
+package main.java.models.graph;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import models.entities.City;
-import models.entities.Route;
+
+import main.java.entities.City;
+import main.java.entities.Route;
 
 public class RegionalGraph {
     private Map<String, City> cities;
@@ -21,7 +22,7 @@ public class RegionalGraph {
     }
 
     public void addBiRoute(City cityA, City cityB, double weight) {
-        Route newRoute = new Route(cityA, cityB, weight, models.types.AccessState.OPEN);
+        Route newRoute = new Route(cityA, cityB, weight, main.java.models.types.AccessState.OPEN);
         this.routes.add(newRoute);
     }
 

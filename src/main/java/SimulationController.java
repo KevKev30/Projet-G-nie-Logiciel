@@ -1,15 +1,16 @@
+package main.java;
 import javafx.animation.Timeline;
 import javafx.animation.KeyFrame;
 import javafx.util.Duration;
-
-import models.entities.City;
-import models.entities.Region;
-import models.entities.Route;
-import models.entities.User;
-import models.graph.NationalGraph;
-import models.graph.RegionalGraph;
-import models.types.AccessState;
-import models.types.Color;
+import main.java.entities.City;
+import main.java.entities.Region;
+import main.java.entities.Route;
+import main.java.entities.User;
+import main.java.models.graph.NationalGraph;
+import main.java.models.graph.RegionalGraph;
+import main.java.models.types.AccessState;
+import main.java.models.types.Color;
+import main.java.view.SimulationView;
 
 public class SimulationController {
 

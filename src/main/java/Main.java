@@ -1,11 +1,13 @@
+package main.java;
 import java.util.List;
-import models.entities.City;
-import models.entities.Region;
-import models.entities.Route;
-import models.graph.NationalGraph;
-import models.graph.RegionalGraph;
-import models.types.AccessState;
-import models.types.Color;
+
+import main.java.entities.City;
+import main.java.entities.Region;
+import main.java.entities.Route;
+import main.java.models.graph.NationalGraph;
+import main.java.models.graph.RegionalGraph;
+import main.java.models.types.AccessState;
+import main.java.models.types.Color;
 
 public class Main {
     public static void main(String[] args) {

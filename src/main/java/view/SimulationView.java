@@ -1,3 +1,4 @@
+package main.java.view;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -7,13 +8,12 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.*;
 import javafx.stage.Stage;
-
-import models.entities.City;
-import models.entities.Region;
-import models.entities.Route;
-import models.graph.NationalGraph;
-import models.graph.RegionalGraph;
-import models.types.AccessState;
+import main.java.entities.City;
+import main.java.entities.Region;
+import main.java.entities.Route;
+import main.java.models.graph.NationalGraph;
+import main.java.models.graph.RegionalGraph;
+import main.java.models.types.AccessState;
 
 import java.util.*;
 
@@ -449,9 +449,9 @@ public class SimulationView extends Application {
         orangeBtn.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white; -fx-cursor: hand;");
         redBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-cursor: hand;");
 
-        greenBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, models.types.Color.GREEN); popup.close(); });
-        orangeBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, models.types.Color.ORANGE); popup.close(); });
-        redBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, models.types.Color.RED); popup.close(); });
+        greenBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, main.java.models.types.Color.GREEN); popup.close(); });
+        orangeBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, main.java.models.types.Color.ORANGE); popup.close(); });
+        redBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, main.java.models.types.Color.RED); popup.close(); });
 
         VBox layout = new VBox(15, label, greenBtn, orangeBtn, redBtn);
         layout.setPadding(new Insets(20));
@@ -488,7 +488,7 @@ public class SimulationView extends Application {
         }
     }
 
-    private Color convertColor(models.types.Color color) {
+    private Color convertColor(main.java.models.types.Color color) {
         switch (color) {
             case RED:    return Color.valueOf("#e74c3c");
             case ORANGE: return Color.valueOf("#e67e22");

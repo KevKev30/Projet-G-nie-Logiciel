@@ -1,6 +1,6 @@
-package models.entities;
+package main.java.entities;
 
-import models.types.Color;
+import main.java.models.types.Color;
 
 public class City{
     private String name;

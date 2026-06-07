@@ -1,9 +1,9 @@
-package models.graph;
+package main.java.models.graph;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import models.entities.Region;
+import main.java.entities.Region;
 
 public class NationalGraph {
     private Map<String, Region> regions;
