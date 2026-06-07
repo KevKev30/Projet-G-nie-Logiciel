@@ -1,21 +1,37 @@
-package main.java.view;
+package view;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import controller.SimulationController;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
+import javafx.scene.control.Slider;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.*;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
-import main.java.entities.City;
-import main.java.entities.Region;
-import main.java.entities.Route;
-import main.java.models.graph.NationalGraph;
-import main.java.models.graph.RegionalGraph;
-import main.java.models.types.AccessState;
-
-import java.util.*;
+import models.entities.City;
+import models.entities.Region;
+import models.entities.Route;
+import models.graph.RegionalGraph;
+import models.types.AccessState;
 
 public class SimulationView extends Application {
 
@@ -38,7 +54,6 @@ public class SimulationView extends Application {
         renderNationalMap();
 
         Scene scene = new Scene(root, 1100, 750);
-        scene.getStylesheets().add("style.css");
         stage.setTitle("Observatoire Epidémiologique National");
         stage.setScene(scene);
         stage.show();
@@ -47,7 +62,6 @@ public class SimulationView extends Application {
     // ==================== BARRES ====================
 
     private VBox buildTopBar() {
-        // Barre utilisateur
         userLabel = new Label("Utilisateur");
         userLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
 
@@ -59,8 +73,6 @@ public class SimulationView extends Application {
         lambdaBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
         lambdaBtn.setOnAction(e -> controller.loginAsLambda());
 
-        Region spacer = null;
-        HBox.setHgrow(new Label(), Priority.ALWAYS);
         HBox userBar = new HBox(10);
         userBar.getChildren().addAll(
             new Label("") {{ setStyle("-fx-text-fill:white;"); }},
@@ -72,7 +84,6 @@ public class SimulationView extends Application {
         userBar.setAlignment(Pos.CENTER_RIGHT);
         userBar.setStyle("-fx-background-color: #2c3e50;");
 
-        // Barre de contrôle
         playPauseBtn = new Button("▶ Play");
         playPauseBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand; -fx-min-width: 90px;");
         playPauseBtn.setOnAction(e -> controller.togglePlayPause());
@@ -148,7 +159,6 @@ public class SimulationView extends Application {
     public void renderNationalMap() {
         currentRegion = null;
 
-        // Titre + stats globales
         int totalInfected = 0;
         for (Region r : controller.getNationalGraph().getRegions().values()) {
             r.totalInfectedGraph();
@@ -165,7 +175,6 @@ public class SimulationView extends Application {
         titleBar.setPadding(new Insets(15, 20, 10, 20));
         titleBar.setAlignment(Pos.CENTER_LEFT);
 
-        // Grille des régions
         FlowPane regionsPane = new FlowPane();
         regionsPane.setHgap(20);
         regionsPane.setVgap(20);
@@ -180,11 +189,9 @@ public class SimulationView extends Application {
     }
 
     private VBox buildRegionCard(Region region) {
-        // Couleur de fond selon risque
         Color bgColor = convertColor(region.getRiskColor());
         String bgHex = toHex(bgColor);
 
-        // En-tête colorée
         Label nameLabel = new Label(region.getName());
         nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 8 12 8 12;");
 
@@ -192,26 +199,24 @@ public class SimulationView extends Application {
         header.setStyle("-fx-background-color: " + bgHex + "; -fx-background-radius: 8 8 0 0;");
         header.setAlignment(Pos.CENTER);
 
-        // Statistiques
         int totalPop = 0;
         int totalInf = 0;
         int totalSafe = 0;
         for (City city : region.getRegionalGraph().getCities().values()) {
-            totalPop += city.getTotalPopulation();
-            totalInf += city.getInfected();
+            totalPop  += city.getTotalPopulation();
+            totalInf  += city.getInfected();
             totalSafe += city.getSafe();
         }
         double rate = totalPop > 0 ? (double) totalInf / totalPop * 100 : 0;
 
-        Label popLabel = new Label("Population : " + totalPop);
-        Label infLabel = new Label("Infectés : " + totalInf);
+        Label popLabel  = new Label("Population : " + totalPop);
+        Label infLabel  = new Label("Infectés : " + totalInf);
         infLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
         Label safeLabel = new Label("Sains : " + totalSafe);
         safeLabel.setStyle("-fx-text-fill: #27ae60;");
         Label rateLabel = new Label(String.format("Taux : %.1f%%", rate));
         rateLabel.setStyle("-fx-font-weight: bold;");
 
-        // Barre de progression infection
         ProgressBar progressBar = new ProgressBar(Math.min(rate / 100, 1.0));
         progressBar.setPrefWidth(160);
         progressBar.setStyle(rate > 60 ? "-fx-accent: #e74c3c;" :
@@ -221,7 +226,6 @@ public class SimulationView extends Application {
         stats.setPadding(new Insets(10, 12, 10, 12));
         stats.setStyle("-fx-background-color: white;");
 
-        // Bouton zoom
         Button zoomBtn = new Button("🔍 Voir la région");
         zoomBtn.setStyle("-fx-background-color: " + bgHex + "; -fx-text-fill: white; -fx-cursor: hand; -fx-font-weight: bold; -fx-background-radius: 0 0 8 8;");
         zoomBtn.setMaxWidth(Double.MAX_VALUE);
@@ -231,9 +235,8 @@ public class SimulationView extends Application {
         card.setStyle("-fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 6, 0, 0, 2);");
         card.setPrefWidth(200);
 
-        // Hover effect
         card.setOnMouseEntered(e -> card.setStyle("-fx-border-color: #3498db; -fx-border-width: 2; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 10, 0, 0, 3); -fx-cursor: hand;"));
-        card.setOnMouseExited(e -> card.setStyle("-fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 6, 0, 0, 2);"));
+        card.setOnMouseExited(e  -> card.setStyle("-fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 6, 0, 0, 2);"));
 
         return card;
     }
@@ -248,17 +251,14 @@ public class SimulationView extends Application {
         RegionalGraph rg = region.getRegionalGraph();
         List<City> cities = new ArrayList<>(rg.getCities().values());
 
-        // Calcul taille de la grille
         int cols = (int) Math.ceil(Math.sqrt(cities.size()));
         int rows = (int) Math.ceil((double) cities.size() / cols);
 
-        // Positions des villes dans la grille
         Map<String, int[]> gridPositions = new HashMap<>();
         for (int i = 0; i < cities.size(); i++) {
             gridPositions.put(cities.get(i).getName(), new int[]{i % cols, i / cols});
         }
 
-        // Pane pour dessiner routes + cellules
         Pane gridPane = new Pane();
         int paneW = cols * (CELL_SIZE + GRID_GAP) + GRID_GAP + 20;
         int paneH = rows * (CELL_SIZE + GRID_GAP) + GRID_GAP + 20;
@@ -307,7 +307,6 @@ public class SimulationView extends Application {
             double x = pos[0] * (CELL_SIZE + GRID_GAP) + 10;
             double y = pos[1] * (CELL_SIZE + GRID_GAP) + 10;
 
-            // Cellule colorée
             Rectangle cell = new Rectangle(x, y, CELL_SIZE, CELL_SIZE);
             cell.setFill(convertColor(city.getRiskColor()));
             cell.setStroke(Color.WHITE);
@@ -315,27 +314,23 @@ public class SimulationView extends Application {
             cell.setArcWidth(10);
             cell.setArcHeight(10);
 
-            // Nom de la ville
             Label nameLabel = new Label(city.getName());
             nameLabel.setLayoutX(x + 4);
             nameLabel.setLayoutY(y + 5);
             nameLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 10px;");
             nameLabel.setMaxWidth(CELL_SIZE - 8);
 
-            // Nombre infectés
             Label infLabel = new Label("🦠 " + city.getInfected());
             infLabel.setLayoutX(x + 4);
             infLabel.setLayoutY(y + CELL_SIZE - 22);
             infLabel.setStyle("-fx-text-fill: white; -fx-font-size: 10px;");
 
-            // Taux
             double rate = city.getInfectionRate() * 100;
             Label rateLabel = new Label(String.format("%.0f%%", rate));
             rateLabel.setLayoutX(x + CELL_SIZE - 32);
             rateLabel.setLayoutY(y + 5);
             rateLabel.setStyle("-fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: bold;");
 
-            // Tooltip complet
             Tooltip tip = new Tooltip(
                 city.getName() + "\n" +
                 "Sains      : " + city.getSafe() + "\n" +
@@ -346,7 +341,6 @@ public class SimulationView extends Application {
             );
             Tooltip.install(cell, tip);
 
-            // Admin : clic sur cellule
             cell.setOnMouseClicked(e -> {
                 if (controller.isAdmin()) {
                     showAdminCityPanel(regionName, city.getName());
@@ -357,15 +351,12 @@ public class SimulationView extends Application {
             gridPane.getChildren().addAll(cell, nameLabel, infLabel, rateLabel);
         }
 
-        // ScrollPane si la grille est grande
         ScrollPane scroll = new ScrollPane(gridPane);
         scroll.setFitToWidth(false);
         scroll.setStyle("-fx-background-color: #ecf0f1;");
 
-        // Panel stats de la région
         VBox statsPanel = buildRegionStatsPanel(region);
 
-        // Layout principal
         Button backBtn = new Button("← Carte Nationale");
         backBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
         backBtn.setOnAction(e -> renderNationalMap());
@@ -378,7 +369,6 @@ public class SimulationView extends Application {
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-width: 0 0 1 0;");
 
-        // Panel admin
         HBox adminPanel = controller.isAdmin() ? buildAdminPanel() : new HBox();
 
         HBox content = new HBox(15, scroll, statsPanel);
@@ -437,9 +427,9 @@ public class SimulationView extends Application {
         Label label = new Label("Changer le statut de " + cityName);
         label.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
 
-        Button greenBtn = new Button("🟢 Faible risque (Vert)");
+        Button greenBtn  = new Button("🟢 Faible risque (Vert)");
         Button orangeBtn = new Button("🟠 Risque moyen (Orange)");
-        Button redBtn = new Button("🔴 Risque élevé (Rouge)");
+        Button redBtn    = new Button("🔴 Risque élevé (Rouge)");
 
         greenBtn.setMaxWidth(Double.MAX_VALUE);
         orangeBtn.setMaxWidth(Double.MAX_VALUE);
@@ -449,9 +439,9 @@ public class SimulationView extends Application {
         orangeBtn.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white; -fx-cursor: hand;");
         redBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-cursor: hand;");
 
-        greenBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, main.java.models.types.Color.GREEN); popup.close(); });
-        orangeBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, main.java.models.types.Color.ORANGE); popup.close(); });
-        redBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, main.java.models.types.Color.RED); popup.close(); });
+        greenBtn.setOnAction(e  -> { controller.setCityColor(regionName, cityName, models.types.Color.GREEN);  popup.close(); });
+        orangeBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, models.types.Color.ORANGE); popup.close(); });
+        redBtn.setOnAction(e    -> { controller.setCityColor(regionName, cityName, models.types.Color.RED);    popup.close(); });
 
         VBox layout = new VBox(15, label, greenBtn, orangeBtn, redBtn);
         layout.setPadding(new Insets(20));
@@ -488,7 +478,11 @@ public class SimulationView extends Application {
         }
     }
 
-    private Color convertColor(main.java.models.types.Color color) {
+    /**
+     * Converts a models.types.Color enum to a JavaFX Color for rendering.
+     * Using fully qualified name to avoid conflict with javafx.scene.paint.Color.
+     */
+    private Color convertColor(models.types.Color color) {
         switch (color) {
             case RED:    return Color.valueOf("#e74c3c");
             case ORANGE: return Color.valueOf("#e67e22");
@@ -498,9 +492,9 @@ public class SimulationView extends Application {
 
     private String toHex(Color color) {
         return String.format("#%02x%02x%02x",
-            (int)(color.getRed() * 255),
+            (int)(color.getRed()   * 255),
             (int)(color.getGreen() * 255),
-            (int)(color.getBlue() * 255));
+            (int)(color.getBlue()  * 255));
     }
 
     public static void main(String[] args) {

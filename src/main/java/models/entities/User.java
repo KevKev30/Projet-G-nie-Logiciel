@@ -1,4 +1,4 @@
-package main.java.entities;
+package models.entities;
 
 public class User {
     public enum Role {

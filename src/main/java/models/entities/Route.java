@@ -1,6 +1,6 @@
-package main.java.entities;
+package models.entities;
 
-import main.java.models.types.AccessState;
+import models.types.AccessState;
 
 public class Route {
     private City cityA;

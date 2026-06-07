@@ -1,4 +1,4 @@
-package main.java.models.types;
+package models.types;
 
 public enum Color {
     GREEN("Green"), 

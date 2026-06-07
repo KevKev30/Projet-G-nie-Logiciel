@@ -1,7 +1,7 @@
-package main.java.entities;
+package models.entities;
 
-import main.java.models.graph.RegionalGraph;
-import main.java.models.types.Color;
+import models.graph.RegionalGraph;
+import models.types.Color;
 
 public class Region {
     private String name;
