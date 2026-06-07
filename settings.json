@@ -1,0 +1,7 @@
+{
+    "java.project.referencedLibraries": [
+        "H:\\CYTECHDATA\\Desktop\\ProjetGenieLogiciel\\javafx-sdk-21.0.11\\lib\\*.jar"
+    ],
+    "java.project.sourcePaths": ["src"],
+    "java.project.outputPath": "bin"
+}
