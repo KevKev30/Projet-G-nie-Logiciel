@@ -41,424 +41,752 @@ public class SimulationView extends Application {
     private Label userLabel;
     private Button playPauseBtn;
     private String currentRegion = null;
+    private Pane mapPane;
+    private VBox rightPanel;
 
-    private static final int CELL_SIZE = 90;
-    private static final int GRID_GAP = 4;
+    // Stats globales
+    private Label statCasActifs;
+    private Label statTauxNational;
+    private Label statZones;
+    private Label statMaj;
+
+    private static final int CELL_SIZE = 85;
+    private static final int CELL_GAP = 5;
 
     @Override
     public void start(Stage stage) {
         controller = new SimulationController(this);
         root = new BorderPane();
-        root.setTop(buildTopBar());
-        root.setBottom(buildBottomBar());
+        root.setTop(buildNavBar());
+        root.setBottom(buildBottomStatsBar());
+        root.setRight(buildRightPanel());
         renderNationalMap();
 
-        Scene scene = new Scene(root, 1100, 750);
-        stage.setTitle("Observatoire Epidémiologique National");
+        Scene scene = new Scene(root, 1100, 700);
+        stage.setTitle("EpiSim — Observatoire Epidémiologique");
         stage.setScene(scene);
         stage.show();
     }
 
-    // ==================== BARRES ====================
+    // ==================== NAVBAR ====================
 
-    private VBox buildTopBar() {
-        userLabel = new Label("Utilisateur");
-        userLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
+    private HBox buildNavBar() {
+        // Logo
+        Label logo = new Label("🦠 EpiSim");
+        logo.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;");
 
-        Button adminBtn = new Button("🔑 Admin");
-        adminBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
-        adminBtn.setOnAction(e -> controller.loginAsAdmin());
+        // Nav items
+        Button carteBtn   = buildNavBtn("Carte",      true);
+        Button simuBtn    = buildNavBtn("Simulation", false);
+        Button donneesBtn = buildNavBtn("Données",    false);
 
-        Button lambdaBtn = new Button("👤 Utilisateur");
-        lambdaBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
-        lambdaBtn.setOnAction(e -> controller.loginAsLambda());
+        carteBtn.setOnAction(e -> renderNationalMap());
 
-        HBox userBar = new HBox(10);
-        userBar.getChildren().addAll(
-            new Label("") {{ setStyle("-fx-text-fill:white;"); }},
-            createSpacer(),
-            new Label("Connecté :") {{ setStyle("-fx-text-fill:#aaa;"); }},
-            userLabel, adminBtn, lambdaBtn
+        // Séparateur flexible
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        // Bouton connexion
+        Button loginBtn = new Button("🔑 Connexion Expert");
+        loginBtn.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-text-fill: white;" +
+            "-fx-border-color: white;" +
+            "-fx-border-radius: 4;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 5 12 5 12;"
         );
-        userBar.setPadding(new Insets(6, 15, 6, 15));
-        userBar.setAlignment(Pos.CENTER_RIGHT);
-        userBar.setStyle("-fx-background-color: #2c3e50;");
+        loginBtn.setOnAction(e -> showLoginDialog());
 
-        playPauseBtn = new Button("▶ Play");
-        playPauseBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand; -fx-min-width: 90px;");
+        // Statut utilisateur
+        userLabel = new Label("👤 Visiteur");
+        userLabel.setStyle("-fx-text-fill: #aaa; -fx-font-size: 12px;");
+
+        HBox navBar = new HBox(20,
+            logo, carteBtn, simuBtn, donneesBtn,
+            spacer, userLabel, loginBtn
+        );
+        navBar.setPadding(new Insets(12, 20, 12, 20));
+        navBar.setAlignment(Pos.CENTER_LEFT);
+        navBar.setStyle("-fx-background-color: #1a252f;");
+
+        return navBar;
+    }
+
+    private Button buildNavBtn(String text, boolean active) {
+        Button btn = new Button(text);
+        btn.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-text-fill: " + (active ? "white" : "#aaa") + ";" +
+            "-fx-font-size: 14px;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 5 10 5 10;" +
+            (active ? "-fx-border-color: transparent transparent white transparent; -fx-border-width: 0 0 2 0;" : "")
+        );
+        return btn;
+    }
+
+    // ==================== PANEL DROIT ====================
+
+    private VBox buildRightPanel() {
+        rightPanel = new VBox(0);
+        rightPanel.setPrefWidth(280);
+        rightPanel.setStyle("-fx-background-color: #1e2d3d;");
+
+        // Section niveau de risque
+        VBox riskSection = buildSection("Niveau de risque");
+        riskSection.getChildren().addAll(
+            buildRiskItem("🔴", "Élevé  (taux > 60%)",  "#e74c3c"),
+            buildRiskItem("🟠", "Modéré (taux 30-60%)", "#e67e22"),
+            buildRiskItem("🟢", "Faible  (taux < 30%)", "#27ae60")
+        );
+
+        // Section région sélectionnée (vide au départ)
+        VBox regionSection = buildSection("Sélectionnez une région");
+        regionSection.setId("regionSection");
+
+        // Section contrôles simulation
+        VBox simSection = buildSection("Simulation");
+
+        playPauseBtn = new Button("▶  Lancer la simulation");
+        playPauseBtn.setMaxWidth(Double.MAX_VALUE);
+        playPauseBtn.setStyle(
+            "-fx-background-color: #27ae60;" +
+            "-fx-text-fill: white;" +
+            "-fx-font-weight: bold;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 8;" +
+            "-fx-background-radius: 4;"
+        );
         playPauseBtn.setOnAction(e -> controller.togglePlayPause());
 
-        Button stepBtn = new Button("⏭ Étape");
-        stepBtn.setStyle("-fx-background-color: #8e44ad; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        Button stepBtn = new Button("⏭  Étape suivante");
+        stepBtn.setMaxWidth(Double.MAX_VALUE);
+        stepBtn.setStyle(
+            "-fx-background-color: #8e44ad;" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 8;" +
+            "-fx-background-radius: 4;"
+        );
         stepBtn.setOnAction(e -> controller.stepForward());
 
-        Button randomBtn = new Button("⚡ Événement aléatoire");
-        randomBtn.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        Button randomBtn = new Button("⚡  Événement aléatoire");
+        randomBtn.setMaxWidth(Double.MAX_VALUE);
+        randomBtn.setStyle(
+            "-fx-background-color: #e67e22;" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 8;" +
+            "-fx-background-radius: 4;"
+        );
         randomBtn.setOnAction(e -> controller.generateRandomEvent());
+
+        Label speedLabel = new Label("Vitesse de simulation");
+        speedLabel.setStyle("-fx-text-fill: #aaa; -fx-font-size: 11px;");
 
         Slider speedSlider = new Slider(0.5, 3.0, 1.0);
         speedSlider.setShowTickLabels(true);
-        speedSlider.setPrefWidth(120);
-        speedSlider.valueProperty().addListener((obs, o, n) -> controller.changeSpeed(n.doubleValue()));
+        speedSlider.setMaxWidth(Double.MAX_VALUE);
+        speedSlider.setStyle("-fx-control-inner-background: #2c3e50;");
+        speedSlider.valueProperty().addListener(
+            (obs, o, n) -> controller.changeSpeed(n.doubleValue())
+        );
 
-        HBox controlBar = new HBox(12,
+        simSection.getChildren().addAll(
             playPauseBtn, stepBtn, randomBtn,
-            new Separator() {{ setStyle("-fx-orientation: vertical;"); }},
-            new Label("Vitesse :") {{ setStyle("-fx-font-weight: bold;"); }},
-            speedSlider,
-            new Separator() {{ setStyle("-fx-orientation: vertical;"); }},
-            buildLegend()
+            speedLabel, speedSlider
         );
-        controlBar.setPadding(new Insets(8, 15, 8, 15));
-        controlBar.setAlignment(Pos.CENTER_LEFT);
-        controlBar.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-width: 0 0 2 0;");
 
-        return new VBox(userBar, controlBar);
+        rightPanel.getChildren().addAll(riskSection, new Separator(), regionSection, new Separator(), simSection);
+        return rightPanel;
     }
 
-    private HBox createSpacer() {
-        HBox spacer = new HBox();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        return spacer;
-    }
-
-    private HBox buildLegend() {
-        HBox legend = new HBox(12,
-            buildLegendItem(Color.valueOf("#27ae60"), "Faible risque"),
-            buildLegendItem(Color.valueOf("#e67e22"), "Risque moyen"),
-            buildLegendItem(Color.valueOf("#e74c3c"), "Risque élevé"),
-            buildLegendItem(Color.DARKGRAY, "Route bloquée")
+    private VBox buildSection(String title) {
+        Label lbl = new Label(title);
+        lbl.setStyle(
+            "-fx-text-fill: #ecf0f1;" +
+            "-fx-font-size: 13px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-padding: 0 0 8 0;"
         );
-        legend.setAlignment(Pos.CENTER);
-        return legend;
+        VBox section = new VBox(8, lbl);
+        section.setPadding(new Insets(15));
+        return section;
     }
 
-    private HBox buildLegendItem(Color color, String text) {
-        Rectangle r = new Rectangle(14, 14, color);
-        r.setStroke(Color.BLACK);
-        r.setArcWidth(3);
-        r.setArcHeight(3);
+    private HBox buildRiskItem(String emoji, String text, String color) {
+        Label dot = new Label(emoji);
         Label lbl = new Label(text);
-        lbl.setStyle("-fx-font-size: 11px;");
-        HBox item = new HBox(5, r, lbl);
-        item.setAlignment(Pos.CENTER);
+        lbl.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 12px;");
+        HBox item = new HBox(8, dot, lbl);
+        item.setAlignment(Pos.CENTER_LEFT);
         return item;
     }
 
-    private HBox buildBottomBar() {
-        messageLabel = new Label("Bienvenue dans l'Observatoire Epidémiologique National");
-        messageLabel.setStyle("-fx-text-fill: #2c3e50; -fx-font-style: italic;");
-        HBox bar = new HBox(messageLabel);
-        bar.setPadding(new Insets(6, 15, 6, 15));
-        bar.setStyle("-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7; -fx-border-width: 1 0 0 0;");
+    // ==================== BARRE BAS ====================
+
+    private HBox buildBottomStatsBar() {
+        statCasActifs    = new Label("0");
+        statTauxNational = new Label("0.00");
+        statZones        = new Label("0");
+        statMaj          = new Label("0%");
+        messageLabel     = new Label("Bienvenue sur EpiSim");
+
+        HBox bar = new HBox(0,
+            buildStatCell(statCasActifs,    "Cas actifs France", "#e74c3c"),
+            buildStatCell(statTauxNational, "Taux national",     "#e67e22"),
+            buildStatCell(statZones,        "Zones surveillées", "#3498db"),
+            buildStatCell(statMaj,          "Données à jour",    "#27ae60"),
+            buildMessageCell()
+        );
+        bar.setStyle("-fx-background-color: #1a252f;");
         return bar;
+    }
+
+    private VBox buildStatCell(Label valueLabel, String title, String color) {
+        valueLabel.setStyle(
+            "-fx-font-size: 22px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-text-fill: " + color + ";"
+        );
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-text-fill: #aaa; -fx-font-size: 11px;");
+
+        VBox cell = new VBox(2, valueLabel, titleLabel);
+        cell.setPadding(new Insets(12, 20, 12, 20));
+        cell.setAlignment(Pos.CENTER);
+        cell.setStyle("-fx-border-color: transparent #2c3e50 transparent transparent; -fx-border-width: 0 1 0 0;");
+        return cell;
+    }
+
+    private HBox buildMessageCell() {
+        messageLabel.setStyle("-fx-text-fill: #aaa; -fx-font-style: italic; -fx-font-size: 12px;");
+        HBox cell = new HBox(messageLabel);
+        cell.setPadding(new Insets(12, 20, 12, 20));
+        cell.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(cell, Priority.ALWAYS);
+        return cell;
     }
 
     // ==================== VUE NATIONALE ====================
 
     public void renderNationalMap() {
         currentRegion = null;
+        updateBottomStats();
 
-        int totalInfected = 0;
-        for (Region r : controller.getNationalGraph().getRegions().values()) {
-            r.totalInfectedGraph();
-            totalInfected += r.getTotalInfected();
+        // Titre
+        Label title = new Label("Carte Nationale — cliquez sur une région");
+        title.setStyle(
+            "-fx-font-size: 15px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-text-fill: #ecf0f1;" +
+            "-fx-padding: 12 15 8 15;"
+        );
+
+        // Grille des régions
+        mapPane = new Pane();
+        List<Region> regions = new ArrayList<>(
+            controller.getNationalGraph().getRegions().values()
+        );
+
+        int cols = (int) Math.ceil(Math.sqrt(regions.size()));
+        for (int i = 0; i < regions.size(); i++) {
+            Region region = regions.get(i);
+            region.totalInfectedGraph();
+
+            int col = i % cols;
+            int row = i / cols;
+            double x = col * (CELL_SIZE + CELL_GAP) + 15;
+            double y = row * (CELL_SIZE + CELL_GAP) + 15;
+
+            VBox card = buildRegionMapCard(region, x, y);
+            mapPane.getChildren().add(card);
         }
 
-        Label title = new Label("🗺  Carte Nationale");
-        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        ScrollPane scroll = new ScrollPane(mapPane);
+        scroll.setStyle("-fx-background-color: #1e2d3d; -fx-background: #1e2d3d;");
+        scroll.setFitToWidth(true);
 
-        Label statsLabel = new Label("Total infectés (national) : " + totalInfected);
-        statsLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+        VBox center = new VBox(title, scroll);
+        center.setStyle("-fx-background-color: #1e2d3d;");
+        VBox.setVgrow(scroll, Priority.ALWAYS);
 
-        HBox titleBar = new HBox(20, title, statsLabel);
-        titleBar.setPadding(new Insets(15, 20, 10, 20));
-        titleBar.setAlignment(Pos.CENTER_LEFT);
-
-        FlowPane regionsPane = new FlowPane();
-        regionsPane.setHgap(20);
-        regionsPane.setVgap(20);
-        regionsPane.setPadding(new Insets(10, 20, 20, 20));
-
-        for (Region region : controller.getNationalGraph().getRegions().values()) {
-            regionsPane.getChildren().add(buildRegionCard(region));
-        }
-
-        VBox center = new VBox(titleBar, new Separator(), regionsPane);
         root.setCenter(center);
+        updateRightPanelDefault();
     }
 
-    private VBox buildRegionCard(Region region) {
+    private VBox buildRegionMapCard(Region region, double x, double y) {
         Color bgColor = convertColor(region.getRiskColor());
-        String bgHex = toHex(bgColor);
+        String bgHex  = toHex(bgColor);
+        String darkHex = darken(bgHex);
 
+        // En-tête
         Label nameLabel = new Label(region.getName());
-        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 8 12 8 12;");
-
+        nameLabel.setStyle(
+            "-fx-font-size: 12px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-text-fill: white;" +
+            "-fx-padding: 6 8 6 8;"
+        );
         HBox header = new HBox(nameLabel);
-        header.setStyle("-fx-background-color: " + bgHex + "; -fx-background-radius: 8 8 0 0;");
+        header.setStyle("-fx-background-color: " + darkHex + "; -fx-background-radius: 6 6 0 0;");
         header.setAlignment(Pos.CENTER);
 
+        // Stats
+        int totalInf = region.getTotalInfected();
         int totalPop = 0;
-        int totalInf = 0;
-        int totalSafe = 0;
-        for (City city : region.getRegionalGraph().getCities().values()) {
-            totalPop  += city.getTotalPopulation();
-            totalInf  += city.getInfected();
-            totalSafe += city.getSafe();
-        }
+        for (City c : region.getRegionalGraph().getCities().values())
+            totalPop += c.getTotalPopulation();
         double rate = totalPop > 0 ? (double) totalInf / totalPop * 100 : 0;
 
-        Label popLabel  = new Label("Population : " + totalPop);
-        Label infLabel  = new Label("Infectés : " + totalInf);
-        infLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
-        Label safeLabel = new Label("Sains : " + totalSafe);
-        safeLabel.setStyle("-fx-text-fill: #27ae60;");
-        Label rateLabel = new Label(String.format("Taux : %.1f%%", rate));
-        rateLabel.setStyle("-fx-font-weight: bold;");
+        Label infLabel = new Label("🦠 " + totalInf + " cas");
+        infLabel.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;");
 
-        ProgressBar progressBar = new ProgressBar(Math.min(rate / 100, 1.0));
-        progressBar.setPrefWidth(160);
-        progressBar.setStyle(rate > 60 ? "-fx-accent: #e74c3c;" :
-                             rate > 30 ? "-fx-accent: #e67e22;" : "-fx-accent: #27ae60;");
+        Label rateLabel = new Label(String.format("%.1f%%", rate));
+        rateLabel.setStyle("-fx-text-fill: white; -fx-font-size: 11px;");
 
-        VBox stats = new VBox(6, popLabel, infLabel, safeLabel, rateLabel, progressBar);
-        stats.setPadding(new Insets(10, 12, 10, 12));
-        stats.setStyle("-fx-background-color: white;");
+        ProgressBar pb = new ProgressBar(Math.min(rate / 100, 1.0));
+        pb.setMaxWidth(Double.MAX_VALUE);
+        pb.setStyle("-fx-accent: white; -fx-control-inner-background: rgba(255,255,255,0.3);");
+        pb.setPrefHeight(6);
 
-        Button zoomBtn = new Button("🔍 Voir la région");
-        zoomBtn.setStyle("-fx-background-color: " + bgHex + "; -fx-text-fill: white; -fx-cursor: hand; -fx-font-weight: bold; -fx-background-radius: 0 0 8 8;");
-        zoomBtn.setMaxWidth(Double.MAX_VALUE);
-        zoomBtn.setOnAction(e -> renderRegionalGrid(region.getName()));
+        VBox body = new VBox(4, infLabel, rateLabel, pb);
+        body.setPadding(new Insets(8));
+        body.setStyle("-fx-background-color: " + bgHex + ";");
 
-        VBox card = new VBox(header, stats, zoomBtn);
-        card.setStyle("-fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 6, 0, 0, 2);");
-        card.setPrefWidth(200);
+        // Bouton voir
+        Button viewBtn = new Button("Voir →");
+        viewBtn.setMaxWidth(Double.MAX_VALUE);
+        viewBtn.setStyle(
+            "-fx-background-color: " + darkHex + ";" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-font-size: 11px;" +
+            "-fx-padding: 4;" +
+            "-fx-background-radius: 0 0 6 6;"
+        );
+        viewBtn.setOnAction(e -> renderRegionalGrid(region.getName()));
 
-        card.setOnMouseEntered(e -> card.setStyle("-fx-border-color: #3498db; -fx-border-width: 2; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 10, 0, 0, 3); -fx-cursor: hand;"));
-        card.setOnMouseExited(e  -> card.setStyle("-fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 6, 0, 0, 2);"));
+        VBox card = new VBox(header, body, viewBtn);
+        card.setPrefWidth(CELL_SIZE + 20);
+        card.setLayoutX(x);
+        card.setLayoutY(y);
+        card.setStyle(
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 8, 0, 0, 2);" +
+            "-fx-background-radius: 6; -fx-border-radius: 6;"
+        );
+
+        // Hover + clic
+        card.setOnMouseEntered(e -> card.setStyle(
+            "-fx-effect: dropshadow(gaussian, rgba(52,152,219,0.8), 12, 0, 0, 3);" +
+            "-fx-background-radius: 6; -fx-border-radius: 6; -fx-cursor: hand;"
+        ));
+        card.setOnMouseExited(e -> card.setStyle(
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 8, 0, 0, 2);" +
+            "-fx-background-radius: 6; -fx-border-radius: 6;"
+        ));
+        card.setOnMouseClicked(e -> {
+            renderRegionalGrid(region.getName());
+            updateRightPanelRegion(region);
+        });
 
         return card;
     }
 
-    // ==================== VUE RÉGIONALE (GRILLE 2D) ====================
+    // ==================== VUE RÉGIONALE ====================
 
     public void renderRegionalGrid(String regionName) {
         currentRegion = regionName;
         Region region = controller.getNationalGraph().getRegions().get(regionName);
         if (region == null) return;
 
+        updateRightPanelRegion(region);
+
         RegionalGraph rg = region.getRegionalGraph();
         List<City> cities = new ArrayList<>(rg.getCities().values());
-
         int cols = (int) Math.ceil(Math.sqrt(cities.size()));
-        int rows = (int) Math.ceil((double) cities.size() / cols);
 
-        Map<String, int[]> gridPositions = new HashMap<>();
+        // Positions
+        Map<String, double[]> positions = new HashMap<>();
         for (int i = 0; i < cities.size(); i++) {
-            gridPositions.put(cities.get(i).getName(), new int[]{i % cols, i / cols});
+            int col = i % cols;
+            int row = i / cols;
+            positions.put(cities.get(i).getName(), new double[]{
+                col * (CELL_SIZE + CELL_GAP * 3) + 15,
+                row * (CELL_SIZE + CELL_GAP * 3) + 15
+            });
         }
 
         Pane gridPane = new Pane();
-        int paneW = cols * (CELL_SIZE + GRID_GAP) + GRID_GAP + 20;
-        int paneH = rows * (CELL_SIZE + GRID_GAP) + GRID_GAP + 20;
-        gridPane.setPrefSize(paneW, paneH);
+        gridPane.setStyle("-fx-background-color: #1e2d3d;");
 
-        // Dessin des routes
+        // Routes
         for (Route route : rg.getRoutes()) {
-            int[] posA = gridPositions.get(route.getCityA().getName());
-            int[] posB = gridPositions.get(route.getCityB().getName());
+            double[] posA = positions.get(route.getCityA().getName());
+            double[] posB = positions.get(route.getCityB().getName());
             if (posA == null || posB == null) continue;
 
-            double x1 = posA[0] * (CELL_SIZE + GRID_GAP) + CELL_SIZE / 2.0 + 10;
-            double y1 = posA[1] * (CELL_SIZE + GRID_GAP) + CELL_SIZE / 2.0 + 10;
-            double x2 = posB[0] * (CELL_SIZE + GRID_GAP) + CELL_SIZE / 2.0 + 10;
-            double y2 = posB[1] * (CELL_SIZE + GRID_GAP) + CELL_SIZE / 2.0 + 10;
+            double x1 = posA[0] + CELL_SIZE / 2.0;
+            double y1 = posA[1] + CELL_SIZE / 2.0;
+            double x2 = posB[0] + CELL_SIZE / 2.0;
+            double y2 = posB[1] + CELL_SIZE / 2.0;
 
-            Line line = new Line(x1, y1, x2, y2);
             boolean blocked = route.getAccess() == AccessState.BARRICATED;
-            line.setStroke(blocked ? Color.DARKGRAY : Color.STEELBLUE);
+            Line line = new Line(x1, y1, x2, y2);
+            line.setStroke(blocked ? Color.valueOf("#e74c3c") : Color.valueOf("#3498db"));
             line.setStrokeWidth(blocked ? 2 : 3);
             if (blocked) line.getStrokeDashArray().addAll(8.0, 4.0);
 
-            final String cityA = route.getCityA().getName();
-            final String cityB = route.getCityB().getName();
+            final String cA = route.getCityA().getName();
+            final String cB = route.getCityB().getName();
             line.setOnMouseClicked(e -> {
-                if (controller.isAdmin()) {
-                    controller.toggleRoute(regionName, cityA, cityB);
-                } else {
-                    showMessage("⛔ Seul l'Admin peut modifier les routes !");
-                }
+                if (controller.isAdmin()) controller.toggleRoute(regionName, cA, cB);
+                else showMessage("⛔ Action réservée à l'Expert !");
             });
             line.setStyle("-fx-cursor: hand;");
             Tooltip.install(line, new Tooltip(
-                (blocked ? "🚧 Bloquée" : "✅ Ouverte") + " : " + cityA + " ↔ " + cityB +
-                (controller.isAdmin() ? "\nCliquez pour " + (blocked ? "ouvrir" : "bloquer") : "")
+                (blocked ? "🚧 Bloquée" : "✅ Ouverte") + " — " + cA + " ↔ " + cB +
+                (controller.isAdmin() ? "\nCliquer pour " + (blocked ? "ouvrir" : "bloquer") : "")
             ));
-
             gridPane.getChildren().add(line);
         }
 
-        // Dessin des cellules (villes)
+        // Cellules
         for (City city : cities) {
-            int[] pos = gridPositions.get(city.getName());
+            double[] pos = positions.get(city.getName());
             if (pos == null) continue;
 
-            double x = pos[0] * (CELL_SIZE + GRID_GAP) + 10;
-            double y = pos[1] * (CELL_SIZE + GRID_GAP) + 10;
+            Color bg = convertColor(city.getRiskColor());
+            String bgHex   = toHex(bg);
+            String darkHex = darken(bgHex);
 
-            Rectangle cell = new Rectangle(x, y, CELL_SIZE, CELL_SIZE);
-            cell.setFill(convertColor(city.getRiskColor()));
-            cell.setStroke(Color.WHITE);
-            cell.setStrokeWidth(2);
+            // Fond cellule
+            Rectangle cell = new Rectangle(pos[0], pos[1], CELL_SIZE, CELL_SIZE);
+            cell.setFill(bg);
             cell.setArcWidth(10);
             cell.setArcHeight(10);
+            cell.setStroke(Color.WHITE);
+            cell.setStrokeWidth(1.5);
 
+            // Nom
             Label nameLabel = new Label(city.getName());
-            nameLabel.setLayoutX(x + 4);
-            nameLabel.setLayoutY(y + 5);
-            nameLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 10px;");
-            nameLabel.setMaxWidth(CELL_SIZE - 8);
+            nameLabel.setLayoutX(pos[0] + 5);
+            nameLabel.setLayoutY(pos[1] + 5);
+            nameLabel.setStyle(
+                "-fx-text-fill: white;" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 10px;"
+            );
+            nameLabel.setMaxWidth(CELL_SIZE - 10);
 
+            // Infectés
             Label infLabel = new Label("🦠 " + city.getInfected());
-            infLabel.setLayoutX(x + 4);
-            infLabel.setLayoutY(y + CELL_SIZE - 22);
+            infLabel.setLayoutX(pos[0] + 5);
+            infLabel.setLayoutY(pos[1] + CELL_SIZE - 30);
             infLabel.setStyle("-fx-text-fill: white; -fx-font-size: 10px;");
 
             double rate = city.getInfectionRate() * 100;
             Label rateLabel = new Label(String.format("%.0f%%", rate));
-            rateLabel.setLayoutX(x + CELL_SIZE - 32);
-            rateLabel.setLayoutY(y + 5);
-            rateLabel.setStyle("-fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: bold;");
+            rateLabel.setLayoutX(pos[0] + CELL_SIZE - 32);
+            rateLabel.setLayoutY(pos[1] + CELL_SIZE - 18);
+            rateLabel.setStyle(
+                "-fx-text-fill: white;" +
+                "-fx-font-size: 11px;" +
+                "-fx-font-weight: bold;"
+            );
 
+            // Mini barre de progression
+            Rectangle progressBg = new Rectangle(pos[0] + 4, pos[1] + CELL_SIZE - 8, CELL_SIZE - 8, 4);
+            progressBg.setFill(Color.valueOf("rgba(255,255,255,0.3)"));
+            progressBg.setArcWidth(3);
+            progressBg.setArcHeight(3);
+
+            double progressWidth = (CELL_SIZE - 8) * Math.min(rate / 100, 1.0);
+            Rectangle progressBar = new Rectangle(pos[0] + 4, pos[1] + CELL_SIZE - 8, progressWidth, 4);
+            progressBar.setFill(Color.WHITE);
+            progressBar.setArcWidth(3);
+            progressBar.setArcHeight(3);
+
+            // Tooltip
             Tooltip tip = new Tooltip(
-                city.getName() + "\n" +
-                "Sains      : " + city.getSafe() + "\n" +
-                "Exposés  : " + city.getExposed() + "\n" +
-                "Infectés   : " + city.getInfected() + "\n" +
+                "📍 " + city.getName() + "\n" +
+                "─────────────────\n" +
+                "Sains      : " + city.getSafe()      + "\n" +
+                "Exposés  : " + city.getExposed()    + "\n" +
+                "Infectés   : " + city.getInfected()  + "\n" +
                 "Guéris     : " + city.getRecovered() + "\n" +
                 String.format("Taux       : %.1f%%", rate)
             );
             Tooltip.install(cell, tip);
 
+            // Clic Admin
             cell.setOnMouseClicked(e -> {
-                if (controller.isAdmin()) {
-                    showAdminCityPanel(regionName, city.getName());
-                }
+                if (controller.isAdmin()) showAdminCityPanel(regionName, city.getName());
+                else showMessage("🔒 Connexion Expert requise pour modifier");
             });
-            cell.setStyle("-fx-cursor: " + (controller.isAdmin() ? "hand" : "default") + ";");
+            cell.setStyle("-fx-cursor: hand;");
 
-            gridPane.getChildren().addAll(cell, nameLabel, infLabel, rateLabel);
+            gridPane.getChildren().addAll(
+                cell, nameLabel, infLabel, rateLabel,
+                progressBg, progressBar
+            );
         }
 
-        ScrollPane scroll = new ScrollPane(gridPane);
-        scroll.setFitToWidth(false);
-        scroll.setStyle("-fx-background-color: #ecf0f1;");
-
-        VBox statsPanel = buildRegionStatsPanel(region);
-
+        // Bouton retour
         Button backBtn = new Button("← Carte Nationale");
-        backBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        backBtn.setStyle(
+            "-fx-background-color: #2c3e50;" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 6 12 6 12;" +
+            "-fx-background-radius: 4;"
+        );
         backBtn.setOnAction(e -> renderNationalMap());
 
-        Label title = new Label("📍 Région : " + regionName);
-        title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Label title = new Label("📍 " + regionName);
+        title.setStyle(
+            "-fx-font-size: 15px;" +
+            "-fx-font-weight: bold;" +
+            "-fx-text-fill: #ecf0f1;"
+        );
 
         HBox topBar = new HBox(15, backBtn, title);
         topBar.setPadding(new Insets(10, 15, 10, 15));
         topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-width: 0 0 1 0;");
+        topBar.setStyle("-fx-background-color: #1a252f;");
 
-        HBox adminPanel = controller.isAdmin() ? buildAdminPanel() : new HBox();
+        ScrollPane scroll = new ScrollPane(gridPane);
+        scroll.setStyle("-fx-background-color: #1e2d3d; -fx-background: #1e2d3d;");
 
-        HBox content = new HBox(15, scroll, statsPanel);
-        content.setPadding(new Insets(15));
+        VBox center = new VBox(topBar, scroll);
+        center.setStyle("-fx-background-color: #1e2d3d;");
+        VBox.setVgrow(scroll, Priority.ALWAYS);
 
-        VBox layout = new VBox(topBar, adminPanel, content);
-        root.setCenter(layout);
+        root.setCenter(center);
     }
 
-    private VBox buildRegionStatsPanel(Region region) {
-        Label title = new Label("📊 Statistiques");
-        title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+    // ==================== PANEL DROIT DYNAMIQUE ====================
 
-        VBox panel = new VBox(10, title, new Separator());
-        panel.setPadding(new Insets(15));
-        panel.setStyle("-fx-background-color: white; -fx-border-color: #dee2e6; -fx-border-radius: 8; -fx-background-radius: 8;");
-        panel.setPrefWidth(220);
+    private void updateRightPanelDefault() {
+        // Remet le panel droit par défaut
+        VBox regionSection = (VBox) rightPanel.lookup("#regionSection");
+        if (regionSection == null) return;
+        regionSection.getChildren().clear();
 
-        for (City city : region.getRegionalGraph().getCities().values()) {
-            Label cityTitle = new Label(city.getName());
-            cityTitle.setStyle("-fx-font-weight: bold; -fx-text-fill: " + toHex(convertColor(city.getRiskColor())) + ";");
-
-            ProgressBar pb = new ProgressBar(Math.min(city.getInfectionRate(), 1.0));
-            pb.setPrefWidth(180);
-            pb.setStyle(city.getInfectionRate() > 0.6 ? "-fx-accent: #e74c3c;" :
-                        city.getInfectionRate() > 0.3 ? "-fx-accent: #e67e22;" : "-fx-accent: #27ae60;");
-
-            Label details = new Label(
-                "🦠 " + city.getInfected() + " infectés / " + city.getTotalPopulation() + " hab."
-            );
-            details.setStyle("-fx-font-size: 11px; -fx-text-fill: #7f8c8d;");
-
-            panel.getChildren().addAll(cityTitle, pb, details, new Separator());
-        }
-
-        return panel;
+        Label title = new Label("Sélectionnez une région");
+        title.setStyle("-fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-font-weight: bold;");
+        Label hint = new Label("Cliquez sur une région\npour voir ses détails");
+        hint.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px;");
+        regionSection.getChildren().addAll(title, hint);
     }
 
-    private HBox buildAdminPanel() {
-        Label title = new Label("🔧 Mode Admin");
-        title.setStyle("-fx-font-weight: bold; -fx-text-fill: #e74c3c;");
-        Label info = new Label("Cliquez sur une ville pour changer son statut | Cliquez sur une route pour la bloquer/ouvrir");
-        info.setStyle("-fx-font-style: italic; -fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+    private void updateRightPanelRegion(Region region) {
+        VBox regionSection = (VBox) rightPanel.lookup("#regionSection");
+        if (regionSection == null) return;
+        regionSection.getChildren().clear();
 
-        HBox panel = new HBox(15, title, info);
-        panel.setPadding(new Insets(6, 15, 6, 15));
-        panel.setStyle("-fx-background-color: #fff3cd; -fx-border-color: #ffc107; -fx-border-width: 0 0 1 0;");
-        panel.setAlignment(Pos.CENTER_LEFT);
-        return panel;
+        String color = toHex(convertColor(region.getRiskColor()));
+
+        Label title = new Label(region.getName());
+        title.setStyle(
+            "-fx-text-fill: " + color + ";" +
+            "-fx-font-size: 14px;" +
+            "-fx-font-weight: bold;"
+        );
+
+        // Badge risque
+        String riskText = region.getRiskColor() == models.types.Color.RED ? "Risque élevé" :
+                          region.getRiskColor() == models.types.Color.ORANGE ? "Risque modéré" : "Faible risque";
+        Label badge = new Label(riskText);
+        badge.setStyle(
+            "-fx-background-color: " + color + ";" +
+            "-fx-text-fill: white;" +
+            "-fx-padding: 3 8 3 8;" +
+            "-fx-background-radius: 10;" +
+            "-fx-font-size: 11px;"
+        );
+
+        // Stats
+        int totalInf = region.getTotalInfected();
+        int totalPop = 0;
+        for (City c : region.getRegionalGraph().getCities().values())
+            totalPop += c.getTotalPopulation();
+        double rate = totalPop > 0 ? (double) totalInf / totalPop * 100 : 0;
+
+        Label casLabel  = buildStatLine("Cas actifs", "" + totalInf, color);
+        Label rateLabel = buildStatLine("Taux", String.format("%.2f%%", rate), color);
+        Label popLabel  = buildStatLine("Population", "" + totalPop, "#ecf0f1");
+
+        Separator sep = new Separator();
+        sep.setStyle("-fx-background-color: #2c3e50;");
+
+        // Actions rapides
+        Label actionsTitle = new Label("Actions rapides");
+        actionsTitle.setStyle("-fx-text-fill: #aaa; -fx-font-size: 11px; -fx-padding: 5 0 5 0;");
+
+        Button simuBtn = new Button("▶  Voir simulation SEIR");
+        simuBtn.setMaxWidth(Double.MAX_VALUE);
+        simuBtn.setStyle(
+            "-fx-background-color: #2980b9;" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 7;" +
+            "-fx-background-radius: 4;" +
+            "-fx-font-size: 11px;"
+        );
+        simuBtn.setOnAction(e -> renderRegionalGrid(region.getName()));
+
+        Button exportBtn = new Button("↓  Exporter les données");
+        exportBtn.setMaxWidth(Double.MAX_VALUE);
+        exportBtn.setStyle(
+            "-fx-background-color: #27ae60;" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 7;" +
+            "-fx-background-radius: 4;" +
+            "-fx-font-size: 11px;"
+        );
+        exportBtn.setOnAction(e -> showMessage("📥 Export des données de " + region.getName()));
+
+        Button alertBtn = new Button("🔔  Activer les alertes");
+        alertBtn.setMaxWidth(Double.MAX_VALUE);
+        alertBtn.setStyle(
+            "-fx-background-color: #e67e22;" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 7;" +
+            "-fx-background-radius: 4;" +
+            "-fx-font-size: 11px;"
+        );
+
+        regionSection.getChildren().addAll(
+            title, badge, sep,
+            casLabel, rateLabel, popLabel, sep,
+            actionsTitle, simuBtn, exportBtn, alertBtn
+        );
     }
+
+    private Label buildStatLine(String key, String value, String color) {
+        Label lbl = new Label(key + " : " + value);
+        lbl.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 12px;");
+        return lbl;
+    }
+
+    // ==================== DIALOGUE LOGIN ====================
+
+    private void showLoginDialog() {
+        Stage popup = new Stage();
+        popup.setTitle("Connexion Expert");
+
+        Label title = new Label("🔑 Connexion Expert");
+        title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #ecf0f1;");
+
+        TextField userField = new TextField();
+        userField.setPromptText("Identifiant");
+        userField.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-prompt-text-fill: #7f8c8d;");
+
+        PasswordField passField = new PasswordField();
+        passField.setPromptText("Mot de passe");
+        passField.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-prompt-text-fill: #7f8c8d;");
+
+        Label hint = new Label("Utilisez admin/admin pour l'accès expert");
+        hint.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 10px;");
+
+        Button loginBtn = new Button("Se connecter");
+        loginBtn.setMaxWidth(Double.MAX_VALUE);
+        loginBtn.setStyle(
+            "-fx-background-color: #27ae60;" +
+            "-fx-text-fill: white;" +
+            "-fx-font-weight: bold;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 8;"
+        );
+        loginBtn.setOnAction(e -> {
+            if (userField.getText().equals("admin") && passField.getText().equals("admin")) {
+                controller.loginAsAdmin();
+                popup.close();
+            } else if (userField.getText().equals("user")) {
+                controller.loginAsLambda();
+                popup.close();
+            } else {
+                hint.setText("❌ Identifiants incorrects !");
+                hint.setStyle("-fx-text-fill: #e74c3c;");
+            }
+        });
+
+        VBox layout = new VBox(12, title, userField, passField, hint, loginBtn);
+        layout.setPadding(new Insets(25));
+        layout.setStyle("-fx-background-color: #1e2d3d;");
+
+        popup.setScene(new Scene(layout, 300, 250));
+        popup.show();
+    }
+
+    // ==================== PANEL ADMIN VILLE ====================
 
     private void showAdminCityPanel(String regionName, String cityName) {
         Stage popup = new Stage();
         popup.setTitle("Modifier : " + cityName);
 
-        Label label = new Label("Changer le statut de " + cityName);
-        label.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+        Label title = new Label("📍 " + cityName);
+        title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ecf0f1;");
 
-        Button greenBtn  = new Button("🟢 Faible risque (Vert)");
-        Button orangeBtn = new Button("🟠 Risque moyen (Orange)");
-        Button redBtn    = new Button("🔴 Risque élevé (Rouge)");
+        Label subtitle = new Label("Modifier le niveau de risque");
+        subtitle.setStyle("-fx-text-fill: #aaa; -fx-font-size: 11px;");
 
-        greenBtn.setMaxWidth(Double.MAX_VALUE);
-        orangeBtn.setMaxWidth(Double.MAX_VALUE);
-        redBtn.setMaxWidth(Double.MAX_VALUE);
+        Button greenBtn  = buildAdminColorBtn("🟢 Faible risque",  "#27ae60", models.types.Color.GREEN,  regionName, cityName, popup);
+        Button orangeBtn = buildAdminColorBtn("🟠 Risque modéré",  "#e67e22", models.types.Color.ORANGE, regionName, cityName, popup);
+        Button redBtn    = buildAdminColorBtn("🔴 Risque élevé",   "#e74c3c", models.types.Color.RED,    regionName, cityName, popup);
 
-        greenBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-cursor: hand;");
-        orangeBtn.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white; -fx-cursor: hand;");
-        redBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-cursor: hand;");
-
-        greenBtn.setOnAction(e  -> { controller.setCityColor(regionName, cityName, models.types.Color.GREEN);  popup.close(); });
-        orangeBtn.setOnAction(e -> { controller.setCityColor(regionName, cityName, models.types.Color.ORANGE); popup.close(); });
-        redBtn.setOnAction(e    -> { controller.setCityColor(regionName, cityName, models.types.Color.RED);    popup.close(); });
-
-        VBox layout = new VBox(15, label, greenBtn, orangeBtn, redBtn);
+        VBox layout = new VBox(10, title, subtitle, greenBtn, orangeBtn, redBtn);
         layout.setPadding(new Insets(20));
-        layout.setAlignment(Pos.CENTER);
+        layout.setStyle("-fx-background-color: #1e2d3d;");
 
-        popup.setScene(new Scene(layout, 280, 220));
+        popup.setScene(new Scene(layout, 260, 220));
         popup.show();
+    }
+
+    private Button buildAdminColorBtn(String text, String color,
+            models.types.Color modelColor, String regionName, String cityName, Stage popup) {
+        Button btn = new Button(text);
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.setStyle(
+            "-fx-background-color: " + color + ";" +
+            "-fx-text-fill: white;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 8;" +
+            "-fx-background-radius: 4;"
+        );
+        btn.setOnAction(e -> {
+            controller.setCityColor(regionName, cityName, modelColor);
+            popup.close();
+        });
+        return btn;
     }
 
     // ==================== UTILITAIRES ====================
 
     public void update() {
-        if (currentRegion != null) {
-            renderRegionalGrid(currentRegion);
-        } else {
-            renderNationalMap();
+        updateBottomStats();
+        if (currentRegion != null) renderRegionalGrid(currentRegion);
+        else renderNationalMap();
+    }
+
+    private void updateBottomStats() {
+        int totalInf = 0, totalPop = 0, zones = 0;
+        for (Region r : controller.getNationalGraph().getRegions().values()) {
+            r.totalInfectedGraph();
+            totalInf += r.getTotalInfected();
+            zones += r.getRegionalGraph().getCities().size();
+            for (City c : r.getRegionalGraph().getCities().values())
+                totalPop += c.getTotalPopulation();
         }
+        double rate = totalPop > 0 ? (double) totalInf / totalPop * 100 : 0;
+        statCasActifs.setText("" + totalInf);
+        statTauxNational.setText(String.format("%.2f%%", rate));
+        statZones.setText("" + zones);
+        statMaj.setText("100%");
     }
 
     public void showMessage(String msg) {
@@ -466,15 +794,22 @@ public class SimulationView extends Application {
     }
 
     public void updateUserLabel(String text) {
-        userLabel.setText(text);
+        userLabel.setText("👤 " + text);
+        update();
     }
 
     public void setPlayPauseButton(String text) {
         playPauseBtn.setText(text);
-        if (text.contains("Play")) {
-            playPauseBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand; -fx-min-width: 90px;");
+        if (text.contains("Play") || text.contains("Lancer")) {
+            playPauseBtn.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white;" +
+                "-fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8; -fx-background-radius: 4;"
+            );
         } else {
-            playPauseBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand; -fx-min-width: 90px;");
+            playPauseBtn.setStyle(
+                "-fx-background-color: #e74c3c; -fx-text-fill: white;" +
+                "-fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8; -fx-background-radius: 4;"
+            );
         }
     }
 
@@ -493,8 +828,14 @@ public class SimulationView extends Application {
     private String toHex(Color color) {
         return String.format("#%02x%02x%02x",
             (int)(color.getRed()   * 255),
+            (int)(color.getRed()   * 255),
             (int)(color.getGreen() * 255),
             (int)(color.getBlue()  * 255));
+    }
+
+    private String darken(String hex) {
+        Color c = Color.web(hex);
+        return toHex(c.darker());
     }
 
     public static void main(String[] args) {
