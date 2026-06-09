@@ -12,6 +12,7 @@ import models.graph.NationalGraph;
 import models.graph.RegionalGraph;
 import models.types.AccessState;
 import models.types.Color;
+import models.SEIRModel
 
 public class SimulationController {
 
@@ -21,8 +22,7 @@ public class SimulationController {
     private Timeline timeline;
     private boolean isRunning;
     private double speedFactor;
-
-    private SEIRPropagation seirModel;
+    private SEIRModel seirModel;
  
     public SimulationController(SimulationView view) {
         this.view = view;
