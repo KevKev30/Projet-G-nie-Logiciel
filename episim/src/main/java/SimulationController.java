@@ -12,7 +12,7 @@ import models.graph.NationalGraph;
 import models.graph.RegionalGraph;
 import models.types.AccessState;
 import models.types.Color;
-import models.SEIRModel
+import models.types.SEIRModel
 
 public class SimulationController {
 
