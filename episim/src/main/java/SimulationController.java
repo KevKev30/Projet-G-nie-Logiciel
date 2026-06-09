@@ -22,14 +22,16 @@ public class SimulationController {
     private boolean isRunning;
     private double speedFactor;
 
+    private SEIRPropagation seirModel;
+ 
     public SimulationController(SimulationView view) {
         this.view = view;
         this.isRunning = false;
         this.speedFactor = 1.0;
         this.nationalGraph = buildTestData();
         this.currentUser = new User("guest", User.Role.LAMBDA);
+        this.seirModel = SEIRPropagation.covid(); // préréglage par défaut
         setupTimeline();
-    }
 
     // ===================== TIMELINE =====================
 
@@ -67,7 +69,7 @@ public class SimulationController {
         if (isRunning) {
             timeline.play();
             view.setPlayPauseButton("⏸ Pause");
-            view.showMessage("Simulation démarrée");
+            view.showMessage("Simulation démarrée — " + seirModel);
         } else {
             timeline.pause();
             view.setPlayPauseButton("▶ Play");
@@ -76,38 +78,7 @@ public class SimulationController {
     }
 
     public void stepForward() {
-        for (Region region : nationalGraph.getRegions().values()) {
-            RegionalGraph rg = region.getRegionalGraph();
-            java.util.List<City> cities = new java.util.ArrayList<>(rg.getCities().values());
-
-            for (City city : cities) {
-                if (city.getInfected() == 0) continue;
-                for (Route route : rg.getRoutesForCity(city.getName())) {
-                    if (route.getAccess() == AccessState.BARRICATED) continue;
-                    City neighbor = route.getCityA().getName().equals(city.getName())
-                        ? route.getCityB() : route.getCityA();
-
-                    // Propagation selon loi normale simplifiée
-                    double rate = 0.08 + 0.04 * Math.random();
-                    int newInfected = (int)(neighbor.getSafe() * rate);
-                    if (newInfected > neighbor.getSafe()) newInfected = neighbor.getSafe();
-                    if (newInfected <= 0) continue;
-
-                    neighbor.setSafe(neighbor.getSafe() - newInfected);
-                    neighbor.setExposed(neighbor.getExposed() + (newInfected / 2));
-                    neighbor.setInfected(neighbor.getInfected() + newInfected);
-                    neighbor.updateColor();
-
-                    // Observer : bloque automatiquement si taux > 60%
-                    if (neighbor.getInfectionRate() > 0.6) {
-                        blockRoutesForCity(region, neighbor.getName());
-                        view.showMessage("⚠ Quarantaine automatique : " + neighbor.getName());
-                    }
-                }
-            }
-            region.totalInfectedGraph();
-        }
-        view.update();
+      seirModel.step(nationalGraph, view, this);
     }
 
     public void changeSpeed(double factor) {
@@ -119,6 +90,52 @@ public class SimulationController {
         if (wasRunning) timeline.play();
     }
 
+    // ===================== MODÈLE SEIR =====================
+ 
+    public void setSeirPreset(String preset) {
+        if (!isAdmin()) {
+            view.showMessage("Action réservée à l'Admin !");
+            return;
+        }
+        switch (preset.toLowerCase()) {
+            case "grippe"   -> seirModel = SEIRPropagation.flu();
+            case "covid"    -> seirModel = SEIRPropagation.covid();
+            case "rougeole" -> seirModel = SEIRPropagation.measles();
+            case "ebola"    -> seirModel = SEIRPropagation.ebola();
+            default -> {
+                view.showMessage("Préréglage inconnu : " + preset);
+                return;
+            }
+        }
+        view.showMessage("🦠 Modèle changé : " + seirModel);
+        view.update();
+    }
+ 
+    /**
+     * Permet à l'admin de définir des paramètres SEIR personnalisés.
+     *
+     * @param beta  taux de transmission
+     * @param sigma taux d'incubation (1 / durée_incubation en jours)
+     * @param gamma taux de guérison  (1 / durée_infection en jours)
+     * @param mu    taux de mortalité (0 pour désactiver)
+     */
+    public void setSeirParameters(double beta, double sigma, double gamma, double mu) {
+        if (!isAdmin()) {
+            view.showMessage("Action réservée à l'Admin !");
+            return;
+        }
+        seirModel.setBeta(beta);
+        seirModel.setSigma(sigma);
+        seirModel.setGamma(gamma);
+        seirModel.setMu(mu);
+        view.showMessage("⚙ Paramètres SEIR mis à jour — " + seirModel);
+        view.update();
+    }
+    
+    public SEIRPropagation getSeirModel() {
+        return seirModel;
+    }
+ 
     // ===================== ACTIONS ADMIN =====================
 
     public void setCityColor(String regionName, String cityName, Color color) {
