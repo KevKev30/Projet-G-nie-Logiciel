@@ -32,6 +32,8 @@ import models.entities.Region;
 import models.entities.Route;
 import models.graph.RegionalGraph;
 import models.types.AccessState;
+import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
 
 public class SimulationView extends Application {
 
