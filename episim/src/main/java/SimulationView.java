@@ -1,28 +1,42 @@
 package models;
 
-import javafx.application.Application;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.*;
-import javafx.stage.Stage;
-
-import models.entities.City;
-import models.entities.Region;
-import models.entities.Route;
-import models.graph.NationalGraph;
-import models.graph.RegionalGraph;
-import models.types.AccessState;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
+import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.Polygon;
+import javafx.scene.shape.Rectangle;
+import javafx.stage.Stage;
+import models.entities.City;
+import models.entities.Region;
+import models.entities.Route;
+import models.graph.RegionalGraph;
+import models.types.AccessState;
 
 public class SimulationView extends Application {
 
@@ -742,9 +756,9 @@ public class SimulationView extends Application {
             "-fx-font-weight: bold;"
         );
 
-        String riskText = region.getRiskColor() == com.episim.models.types.Color.RED
+        String riskText = region.getRiskColor() == models.types.Color.RED
             ? "Risque élevé"
-            : region.getRiskColor() == com.episim.models.types.Color.ORANGE
+            : region.getRiskColor() == models.types.Color.ORANGE
             ? "Risque modéré" : "Faible risque";
 
         Label badge = new Label(riskText);
@@ -864,13 +878,9 @@ public class SimulationView extends Application {
         Label sub = new Label("Modifier le niveau de risque");
         sub.setStyle("-fx-text-fill: #aaa; -fx-font-size: 11px;");
 
-        Button g = buildColorBtn("🟢 Faible risque", "#27ae60",
-            com.episim.models.types.Color.GREEN, regionName, cityName, popup);
-        Button o = buildColorBtn("🟠 Risque modéré", "#e67e22",
-            com.episim.models.types.Color.ORANGE, regionName, cityName, popup);
-        Button r = buildColorBtn("🔴 Risque élevé",  "#e74c3c",
-            com.episim.models.types.Color.RED,    regionName, cityName, popup);
-
+        Button g = buildColorBtn("🟢 Faible risque", "#27ae60", models.types.Color.GREEN, regionName, cityName, popup);
+        Button o = buildColorBtn("🟠 Risque modéré", "#e67e22", models.types.Color.ORANGE, regionName, cityName, popup);
+        Button r = buildColorBtn("🔴 Risque élevé",  "#e74c3c", models.types.Color.RED,    regionName, cityName, popup);
         VBox layout = new VBox(10, title, sub, g, o, r);
         layout.setPadding(new Insets(20));
         layout.setStyle("-fx-background-color: white;");
@@ -880,7 +890,7 @@ public class SimulationView extends Application {
     }
 
     private Button buildColorBtn(String text, String color,
-            com.episim.models.types.Color modelColor,
+            models.types.Color modelColor,
             String regionName, String cityName, Stage popup) {
         Button btn = new Button(text);
         btn.setMaxWidth(Double.MAX_VALUE);
@@ -931,7 +941,7 @@ public class SimulationView extends Application {
                 ? "#27ae60" : "#e74c3c");
     }
 
-    private Color convertColor(com.episim.models.types.Color color) {
+    private Color convertColor(models.types.Color color) {
         switch (color) {
             case RED:    return Color.valueOf("#e74c3c");
             case ORANGE: return Color.valueOf("#e67e22");
