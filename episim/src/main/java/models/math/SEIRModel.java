@@ -1,22 +1,25 @@
-package models;
+package models.math;
 
+import controller.SimulationController;
 import models.entities.City;
 import models.entities.Region;
 import models.entities.Route;
 import models.graph.NationalGraph;
 import models.graph.RegionalGraph;
 import models.types.AccessState;
+import view.SimulationView;
 
 
-public class SEIRPropagation {
+public class SEIRModel {
     private double beta;
     private double sigma;
     private double gamma;
     private double mu;
     private double barricadeReductionFactor;
     private double autoQuarantineThreshold;
+    private double mobilityFactor = 0.1;
 
-    public SEIRPropagation() {
+    public SEIRModel() {
         this(0.3, 0.2, 0.143, 0.001, 0.0, 0.6);
     }
 
@@ -29,7 +32,7 @@ public class SEIRPropagation {
      * @param autoQuarantineThreshold  seuil d'infection pour quarantaine auto (0.0 à 1.0)
      */
   
-    public SEIRPropagation(double beta, double sigma, double gamma, double mu,
+    public SEIRModel(double beta, double sigma, double gamma, double mu,
                            double barricadeReductionFactor, double autoQuarantineThreshold) {
         this.beta = beta;
         this.sigma = sigma;
@@ -135,8 +138,7 @@ public class SEIRPropagation {
                 int N = Math.max(1, source.getSafe() + source.getExposed() + source.getInfected());
 
                 // β est réduit par la distance de la route
-                double distance = Math.max(0.5, route.getDistance());
-                double effectiveBeta = beta * routeFactor / distance;
+                double effectiveBeta = beta * routeFactor * mobilityFactor;
 
                 double newExposures = effectiveBeta * S * I / (double) N;
                 int dE = roundStochastic(newExposures);
@@ -183,23 +185,23 @@ public class SEIRPropagation {
     // ===================== PRÉRÉGLAGES DE DIFFERENTES MALADIES =====================
 
     /** Paramètres représentatifs d'une grippe saisonnière (R0 ≈ 1.5, incubation 2j). */
-    public static SEIRPropagation flu() {
-        return new SEIRPropagation(0.30, 0.50, 0.20, 0.0005, 0.0, 0.6);
+    public static SEIRModel flu() {
+        return new SEIRModel(0.30, 0.50, 0.20, 0.0005, 0.0, 0.6);
     }
 
     /** Paramètres représentatifs d'une rougeole (R0 ≈ 15, très contagieuse). */
-    public static SEIRPropagation measles() {
-        return new SEIRPropagation(0.90, 0.25, 0.10, 0.001, 0.0, 0.5);
+    public static SEIRModel measles() {
+        return new SEIRModel(0.90, 0.25, 0.10, 0.001, 0.0, 0.5);
     }
 
     /** Paramètres représentatifs d'un pathogène modéré type COVID-19 (R0 ≈ 2.5). */
-    public static SEIRPropagation covid() {
-        return new SEIRPropagation(0.35, 0.196, 0.143, 0.003, 0.0, 0.6);
+    public static SEIRModel covid() {
+        return new SEIRModel(0.35, 0.196, 0.143, 0.003, 0.0, 0.6);
     }
 
     /** Pathogène très létal mais peu contagieux (type Ebola). */
-    public static SEIRPropagation ebola() {
-        return new SEIRPropagation(0.15, 0.125, 0.10, 0.05, 0.0, 0.4);
+    public static SEIRModel ebola() {
+        return new SEIRModel(0.15, 0.125, 0.10, 0.05, 0.0, 0.4);
     }
 
     // ===================== GETTERS / SETTERS =====================
@@ -221,7 +223,7 @@ public class SEIRPropagation {
 
     @Override
     public String toString() {
-        return String.format("SEIRPropagation[β=%.3f, σ=%.3f, γ=%.3f, μ=%.4f, R0=%.2f]",
+        return String.format("SEIRModel[β=%.3f, σ=%.3f, γ=%.3f, μ=%.4f, R0=%.2f]",
                 beta, sigma, gamma, mu, getR0());
     }
 }

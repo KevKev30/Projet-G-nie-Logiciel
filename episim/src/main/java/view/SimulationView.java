@@ -1,4 +1,4 @@
-package models;
+package view;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -10,6 +10,7 @@ import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import controller.SimulationController;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;

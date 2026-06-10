@@ -1,21 +1,19 @@
-package models;
+package controller;
 
-import javafx.animation.Timeline;
 import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.util.Duration;
-
 import models.entities.City;
 import models.entities.Region;
 import models.entities.Route;
 import models.entities.User;
 import models.graph.NationalGraph;
-import models.graph.RegionalGraph;
+import models.math.SEIRModel;
 import models.types.AccessState;
 import models.types.Color;
-import models.types.SEIRModel
+import view.SimulationView;
 
-public class SimulationController {
-
+public class SimulationController{
     private NationalGraph nationalGraph;
     private SimulationView view;
     private User currentUser;
@@ -30,8 +28,9 @@ public class SimulationController {
         this.speedFactor = 1.0;
         this.nationalGraph = buildTestData();
         this.currentUser = new User("guest", User.Role.LAMBDA);
-        this.seirModel = SEIRPropagation.covid(); // préréglage par défaut
+        this.seirModel = SEIRModel.covid(); // préréglage par défaut
         setupTimeline();
+    }
 
     // ===================== TIMELINE =====================
 
@@ -98,10 +97,10 @@ public class SimulationController {
             return;
         }
         switch (preset.toLowerCase()) {
-            case "grippe"   -> seirModel = SEIRPropagation.flu();
-            case "covid"    -> seirModel = SEIRPropagation.covid();
-            case "rougeole" -> seirModel = SEIRPropagation.measles();
-            case "ebola"    -> seirModel = SEIRPropagation.ebola();
+            case "grippe"   -> seirModel = SEIRModel.flu();
+            case "covid"    -> seirModel = SEIRModel.covid();
+            case "rougeole" -> seirModel = SEIRModel.measles();
+            case "ebola"    -> seirModel = SEIRModel.ebola();
             default -> {
                 view.showMessage("Préréglage inconnu : " + preset);
                 return;
@@ -132,7 +131,7 @@ public class SimulationController {
         view.update();
     }
     
-    public SEIRPropagation getSeirModel() {
+    public SEIRModel getSeirModel() {
         return seirModel;
     }
  
@@ -271,3 +270,4 @@ public class SimulationController {
         return graph;
     }
 }
+
