@@ -57,10 +57,18 @@ public class City{
         population += add;
     }
 
+    /**
+     * Calculates the total population of the city
+     * @return the total number of people without considering their state
+     */
     public int getTotalPopulation() {
         return this.populationSafe + this.populationExposed + this.populationInfected + this.populationRecovered;
     }
 
+    /**
+     * Calculates the proportion of infected people relative to the total population.
+     * @return a percentage value between 0.0 and 1.0 representing the infection rate
+     */
     public double getInfectionRate() {
         int total = getTotalPopulation();
         if (total == 0) return 0.0;
@@ -87,6 +95,10 @@ public class City{
         this.riskColor = color; 
     }
 
+    /**
+     * Updates the risk color of the city dynamically based on its infection rate.
+     * Green means low risk (<30%), Orange is moderate (<60%), and Red is high risk.
+     */
     public void updateColor() {
         double rate = getInfectionRate();
         if (rate < 0.3) {

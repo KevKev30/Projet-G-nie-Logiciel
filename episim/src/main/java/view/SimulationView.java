@@ -11,6 +11,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import controller.SimulationController;
+import interfaces.Observer;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -39,7 +40,7 @@ import models.entities.Route;
 import models.graph.RegionalGraph;
 import models.types.AccessState;
 
-public class SimulationView extends Application {
+public class SimulationView extends Application implements Observer{
 
     private SimulationController controller;
     private BorderPane root;
@@ -70,6 +71,7 @@ public class SimulationView extends Application {
     @Override
     public void start(Stage stage) {
         controller = new SimulationController(this);
+        controller.getSimulationModel().attach(this);
         root = new BorderPane();
         root.setTop(buildNavBar());
         root.setBottom(buildBottomBar());

@@ -32,6 +32,10 @@ public class Region {
         return totalInfected; 
     }
 
+    public void setRiskColor(Color color){
+        this.riskColor = color;
+    }
+
     /**
      * Calculate the total of persons infected in all the graph
      * In addition, give a color representing the rate of the virus depending on the total population ans the total infected
