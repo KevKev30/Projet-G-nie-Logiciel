@@ -167,4 +167,30 @@ public class SimulationModel implements Subject {
     public DataPersistenceManager getPersistenceManager() { 
         return persistenceManager; 
     }
+
+    // ==================== TIMER GETTERS ====================
+
+    /**
+     * Gets the total number of days elapsed since the start.
+     * @return the total days count
+     */
+    public int getTotalDays() {
+        return this.currentStep;
+    }
+
+    /**
+     * Gets the current day of the week (from 1 to 7).
+     * @return the day number inside the current week
+     */
+    public int getCurrentDay() {
+        return (this.currentStep % 7) + 1;
+    }
+
+    /**
+     * Gets the total number of weeks elapsed since the start.
+     * @return the number of weeks completed
+     */
+    public int getCurrentWeek() {
+        return (this.currentStep / 7) + 1;
+    }
 }
