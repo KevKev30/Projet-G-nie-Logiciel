@@ -12,7 +12,13 @@ public class SimulationEngine {
     /**
      * Computes local biological virus transitions (S -> E -> I -> R) 
      * for every city inside a specific region.
-     * * @param region the region containing the cities to update
+     *
+     * Ajustements COVID par rapport au modèle générique :
+     *  - La mortalité est soustraite des infectés à chaque pas (μ = 2 %)
+     *  - Le taux d'asymptomatiques réduit la pression effective de transmission
+     *    (les asymptomatiques transmettent moins → facteur 0.5 appliqué sur leur part)
+     *
+     * @param region the region containing the cities to update
      * @param config the configuration containing the infection rates
      */
     public void computeLocalSEIR(Region region, SimulationConfig config) {
@@ -27,8 +33,11 @@ public class SimulationEngine {
             int E = city.getExposed();
             int I = city.getInfected();
             int R = city.getRecovered();
-
+            
+            double asymp  = config.getAsymptomaticRate();
+            double effectiveI = I * ((1 - asymp) + asymp * 0.5);
             double lambda = config.getTransmissionRate() * I / total;
+            
             int newExposed = (int) (S * lambda);
             if (newExposed > S) newExposed = S;
 
@@ -38,9 +47,12 @@ public class SimulationEngine {
             int newRecovered = (int) (I * config.getRecoveryRate());
             if (newRecovered > I) newRecovered = I;
 
+            int newDeaths = (int) (I * config.getMortalityRate());
+            if (newDeaths > I - newRecovered) newDeaths = Math.max(0, I - newRecovered);
+
             city.setSafe(S - newExposed);
             city.setExposed(E + newExposed - newInfected);
-            city.setInfected(I + newInfected - newRecovered);
+            city.setInfected(I + newInfected - newRecovered - newDeaths);
             city.setRecovered(R + newRecovered);
 
             city.updateColor();
@@ -64,7 +76,7 @@ public class SimulationEngine {
             City cityB = route.getCityB();
 
             double modifier = (route.getAccess() == AccessState.RESTRICTED) ? 0.2 : 1.0;
-            double fluxFactor = route.getWeight() * modifier * config.getTransmissionRate() * 0.05;
+            double fluxFactor = route.getWeight() * modifier * config.getTransmissionRate() * 0.12;
 
             if (cityA.getInfected() > 0 && cityB.getSafe() > 0) {
                 int inf = (int) (cityB.getSafe() * ((double) cityA.getInfected() / cityA.getTotalPopulation()) * fluxFactor);
