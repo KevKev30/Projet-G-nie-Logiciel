@@ -153,9 +153,13 @@ public class SimulationController {
         }  
     }  
 
-    public void generateRandomEvent() {    
-        model.triggerRandomOutbreak();  
-        view.showMessage("⚡ Événement aléatoire : Foyer épidémique détecté !");  
+    public void generateRandomEvent() {
+        String cityName = model.triggerRandomOutbreak();
+        if (cityName != null) {
+            view.showMessage("⚡ Nouveau foyer COVID détecté à " + cityName + " !");
+        } else {
+            view.showMessage("⚡ Aucune ville disponible pour un nouveau foyer.");
+        }
     }
 
     public void injectVirus(String regionName, String cityName, int count) {
