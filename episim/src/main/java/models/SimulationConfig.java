@@ -69,11 +69,3 @@ public class SimulationConfig {
         this.speedFactor = speedFactor;
     }
 }
-    public double getSpeedFactor() { 
-        return speedFactor; 
-    }
-
-    public void setSpeedFactor(double speedFactor) { 
-        this.speedFactor = speedFactor; 
-    }
-}

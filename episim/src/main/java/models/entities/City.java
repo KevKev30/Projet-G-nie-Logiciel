@@ -53,10 +53,6 @@ public class City{
         return this.riskColor;
     }
 
-    public void addPopulation(int population, int add){
-        population += add;
-    }
-
     /**
      * Calculates the total population of the city
      * @return the total number of people without considering their state

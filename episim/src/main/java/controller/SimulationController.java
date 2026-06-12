@@ -193,58 +193,58 @@ public class SimulationController {
 
     // ===================== TEST =====================
 
-    private NationalGraph buildTestData() {  
+    private NationalGraph buildTestData() {    
         NationalGraph graph = new NationalGraph();  
+        java.util.Random rand = new java.util.Random();
 
-        // Île-de-France  
-        Region idf = new Region("Île-de-France");  
-        City paris = new City("Paris", 300, 50, 200, 100, Color.RED);  
-        City versailles = new City("Versailles", 400, 20,  80,  40, Color.ORANGE);  
-        City evry = new City("Évry", 500, 10,  10,  20, Color.GREEN);  
-        City marne = new City("Marne", 350, 15,  20,  10, Color.GREEN);  
-        idf.getRegionalGraph().addCity(paris);  
-        idf.getRegionalGraph().addCity(versailles);  
-        idf.getRegionalGraph().addCity(evry);  
-        idf.getRegionalGraph().addCity(marne);  
-        idf.getRegionalGraph().addBiRoute(paris, versailles, 1.0);  
-        idf.getRegionalGraph().addBiRoute(paris, marne, 1.2);  
-        idf.getRegionalGraph().addBiRoute(versailles, evry, 1.5);  
-        idf.getRegionalGraph().addBiRoute(marne, evry, 1.3);  
-        graph.addRegion(idf);  
+        String[] regionNames = {
+            "Île-de-France", "Bretagne", "PACA", "Normandie", 
+            "Nouvelle-Aquitaine", "Occitanie", "Auvergne-Rhône-Alpes", 
+            "Grand Est", "Hauts-de-France", "Centre-Val de Loire", 
+            "Pays de la Loire", "Bourgogne-Franche-Comté", "Corse"
+        };
 
-        // Bretagne  
-        Region bretagne = new Region("Bretagne");  
-        City rennes  = new City("Rennes",  400, 10, 20, 15, Color.GREEN);  
-        City brest   = new City("Brest",   250,  5, 10,  8, Color.GREEN);  
-        City lorient = new City("Lorient", 180,  3,  5,  2, Color.GREEN);  
-        bretagne.getRegionalGraph().addCity(rennes);  
-        bretagne.getRegionalGraph().addCity(brest);  
-        bretagne.getRegionalGraph().addCity(lorient);  
-        bretagne.getRegionalGraph().addBiRoute(rennes, brest, 2.0);  
-        bretagne.getRegionalGraph().addBiRoute(brest, lorient, 1.5);  
-        graph.addRegion(bretagne);  
+        java.util.Map<String, String[]> regionalCities = new java.util.HashMap<>();
+    regionalCities.put("Île-de-France", new String[]{"Paris", "Versailles", "Évry", "Marne"});
+    regionalCities.put("Bretagne", new String[]{"Rennes", "Brest", "Lorient", "Vannes"});
+    regionalCities.put("PACA", new String[]{"Marseille", "Nice", "Toulon", "Avignon"});
+    regionalCities.put("Normandie", new String[]{"Rouen", "Caen", "Le Havre", "Cherbourg"});
+    regionalCities.put("Nouvelle-Aquitaine", new String[]{"Bordeaux", "Limoges", "Poitiers", "Pau"});
+    regionalCities.put("Occitanie", new String[]{"Toulouse", "Montpellier", "Nîmes", "Perpignan"});
+    regionalCities.put("Auvergne-Rhône-Alpes", new String[]{"Lyon", "Saint-Étienne", "Grenoble", "Clermont"});
+    regionalCities.put("Grand Est", new String[]{"Strasbourg", "Reims", "Metz", "Nancy"});
+    regionalCities.put("Hauts-de-France", new String[]{"Lille", "Amiens", "Roubaix", "Tourcoing"});
+    regionalCities.put("Centre-Val de Loire", new String[]{"Orléans", "Tours", "Bourges", "Blois"});
+    regionalCities.put("Pays de la Loire", new String[]{"Nantes", "Angers", "Le Mans", "Saint-Nazaire"});
+    regionalCities.put("Bourgogne-Franche-Comté", new String[]{"Dijon", "Besançon", "Belfort", "Chalon"});
+    regionalCities.put("Corse", new String[]{"Ajaccio", "Bastia", "Calvi", "Corte"});
 
-        // PACA  
-        Region paca = new Region("PACA");  
-        City marseille = new City("Marseille", 200, 80, 300, 120, Color.RED);  
-        City nice      = new City("Nice",      350, 40, 150,  60, Color.ORANGE);  
-        City toulon    = new City("Toulon",    280, 30,  80,  40, Color.ORANGE);  
-        paca.getRegionalGraph().addCity(marseille);  
-        paca.getRegionalGraph().addCity(nice);  
-        paca.getRegionalGraph().addCity(toulon);  
-        paca.getRegionalGraph().addBiRoute(marseille, toulon, 1.2);  
-        paca.getRegionalGraph().addBiRoute(toulon, nice, 1.8);  
-        graph.addRegion(paca);  
+        for (String rName : regionNames) {
+            Region region = new Region(rName);
+            String[] cities = regionalCities.get(rName);
+            City[] cityObjects = new City[cities.length];
 
-        // Normandie  
-        Region normandie = new Region("Normandie");  
-        City rouen = new City("Rouen",  300, 20, 40, 20, Color.GREEN);  
-        City caen  = new City("Caen",   250, 10, 15, 10, Color.GREEN);  
-        normandie.getRegionalGraph().addCity(rouen);  
-        normandie.getRegionalGraph().addCity(caen);  
-        normandie.getRegionalGraph().addBiRoute(rouen, caen, 1.5);  
-        graph.addRegion(normandie);  
+            for (int i = 0; i < cities.length; i++) {
+                int safe = 300 + rand.nextInt(500);
+                int exposed = 5 + rand.nextInt(45);
+                int infected = 10 + rand.nextInt(190);
+                int recovered = 10 + rand.nextInt(90);
+                
+                cityObjects[i] = new City(cities[i], safe, exposed, infected, recovered, Color.GREEN);
+                cityObjects[i].updateColor();
+                region.getRegionalGraph().addCity(cityObjects[i]);
+            }
 
+            for (int i = 0; i < cityObjects.length; i++) {
+                City current = cityObjects[i];
+                City next = cityObjects[(i + 1) % cityObjects.length];
+                double weight = 1.0 + (rand.nextDouble() * 1.0);
+                region.getRegionalGraph().addBiRoute(current, next, weight);
+            }
+
+            region.totalInfectedGraph();
+            graph.addRegion(region);
+        }
         return graph;  
     }  
 }
