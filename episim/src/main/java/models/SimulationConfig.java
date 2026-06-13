@@ -18,7 +18,7 @@ public class SimulationConfig {
     private double asymptomaticRate;    // α
     private double speedFactor;
 
-    public SimulationConfig(double transmissionRate, double incubationRate, double recoveryRate) {
+    public SimulationConfig(double transmissionRate, double incubationRate, double recoveryRate) { //here to change the default values of SEIR
         this.transmissionRate   = transmissionRate;
         this.incubationRate     = incubationRate;
         this.recoveryRate       = recoveryRate;

@@ -174,7 +174,7 @@ public class SimulationEngine {
      * during this call, as "RegionA ↔ RegionB" strings.
      * The controller uses this list to display quarantine alerts in the UI.
      */
-    public java.util.List<String> checkAndApplyBarricades(NationalGraph graph) {
+    public java.util.List<String> checkAndApplyBarricades(NationalGraph graph) { //here to modify the quarantine seuil
         java.util.List<String> newlyBlocked = new java.util.ArrayList<>();
 
         // ── Level 1 : city-level barricades on intra-regional routes ─────────

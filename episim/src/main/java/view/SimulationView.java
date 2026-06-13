@@ -8,7 +8,6 @@ import interfaces.Observer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
-import javafx.scene.layout.Priority;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -44,6 +43,7 @@ import java.util.Map;
 public class SimulationView extends Application implements Observer {
 
     private Stage primaryStage;
+    // Controller is the bridge between this view and the model.
     private SimulationController controller;
 
     // ── Two independent map canvases ─────────────────────────────────────────
@@ -57,21 +57,21 @@ public class SimulationView extends Application implements Observer {
     private Label  sandboxStepLabel;
     private Button playPauseButton;
 
-    // ── Open region popup tracking (shared for both maps) ─────────────────────
+    // ── Open region popup tracking (shared for both maps) : used so update() can refresh the content without close it and reopen it─────────────────────
     private Stage  openPopup;
     private String openPopupRegion;
     private NationalGraph openPopupGraph; // which graph the popup is showing
 
     // =========================================================================
-    // JavaFX start
+    // JavaFX start method : called by the framework when the application launches (important order)
     // =========================================================================
 
     @Override
     public void start(Stage stage) {
-        this.primaryStage = stage;
-        this.controller   = new SimulationController(this);
+        this.primaryStage = stage; 
+        this.controller   = new SimulationController(this); // receive the stage and stock it, create the controller and pass this view as observer (so the controller knows how to update the view when the model changes)
 
-        // Build the two tabs
+        // Build the two tabs and add them to a TabPane
         TabPane tabs = new TabPane(
             buildRealTab(),
             buildSandboxTab()
@@ -82,7 +82,7 @@ public class SimulationView extends Application implements Observer {
         stage.setTitle("EpiSim – Simulation épidémique");
         stage.setScene(new Scene(tabs, 900, 700));
         stage.setResizable(false);
-        stage.show();
+        stage.show(); // Show the window before drawing the maps, so the canvas has a size
 
         // Initial draw for both maps
         realMap.draw(controller.getNationalGraph());
@@ -139,13 +139,13 @@ public class SimulationView extends Application implements Observer {
      * Kept: user selector (role affects admin features), timer (read-only),
      * and the save button.
      */
-    private VBox buildRealControlPanel() {
+    private VBox buildRealControlPanel() { // left panel for the real simulation tab
         VBox panel = styledPanel(195);
 
         // User selector — role determines whether admin actions are visible
         userLabel = infoLabel("Invité");
-        Button btnAdmin = actionButton("🔑 Admin");
-        Button btnGuest = actionButton("👤 Invité");
+        Button btnAdmin = actionButton("🔑 Admin"); // call controller.loginAsAdmin()
+        Button btnGuest = actionButton("👤 Invité"); // or controller.loginAsLambda()
         btnAdmin.setOnAction(e -> controller.loginAsAdmin());
         btnGuest.setOnAction(e -> controller.loginAsLambda());
 
@@ -162,6 +162,8 @@ public class SimulationView extends Application implements Observer {
         infoLbl.setFont(Font.font(11));
         infoLbl.setWrapText(true);
 
+        // no play/pause or speed slider here — the real simulation runs automatically
+
         // Save button
         Button btnSave = actionButton("💾 Sauvegarder");
         btnSave.setMaxWidth(Double.MAX_VALUE);
@@ -172,7 +174,7 @@ public class SimulationView extends Application implements Observer {
         btnLoad.setMaxWidth(Double.MAX_VALUE);
         btnLoad.setOnAction(e -> handleLoad());
 
-        panel.getChildren().addAll(
+        panel.getChildren().addAll( // list of buttons and labels in the left panel, here to add buttons
             sectionLabel("Utilisateur"),
             new HBox(6, btnAdmin, btnGuest), userLabel,
             new Separator(),
@@ -237,11 +239,11 @@ public class SimulationView extends Application implements Observer {
         // Sandbox step counter
         // Timer label for the sandbox — same format as the real simulation
         // so the user can compare "Jour 5 Sem. 2 (J+12)" sandbox vs réel.
-        sandboxStepLabel = new javafx.scene.control.Label(sandboxTimerText());
+        sandboxStepLabel = new javafx.scene.control.Label(sandboxTimerText()); // updated by sandboxTimerText()
         sandboxStepLabel.setFont(javafx.scene.text.Font.font(13));
         sandboxStepLabel.setTextFill(javafx.scene.paint.Color.WHITE);
 
-        // Manual step button — advances only the sandbox
+        // Manual step button — advances only the sandbox, calls controller.sandboxStep()
         Button btnStep = actionButton("⏭ Avancer d'un jour");
         btnStep.setMaxWidth(Double.MAX_VALUE);
         btnStep.setOnAction(e -> {
@@ -250,7 +252,7 @@ public class SimulationView extends Application implements Observer {
             sandboxMap.draw(controller.getSandboxGraph());
         });
 
-        // Random event button — injects a random outbreak in the sandbox
+        // Random event button — injects a random outbreak in the sandbox, calls controller.sandboxRandomEvent()
         Button btnRandom = actionButton("⚡ Événement aléatoire");
         btnRandom.setMaxWidth(Double.MAX_VALUE);
         btnRandom.setOnAction(e -> {
@@ -260,7 +262,7 @@ public class SimulationView extends Application implements Observer {
             refreshHistoryBox();
         });
 
-        // Reset sandbox — recopies the real graph so you can start fresh
+        // Reset sandbox — recopies the real graph so you can start fresh, controller.resetSandbox() resets the step counter and clears the history
         Button btnReset = actionButton("↺ Réinitialiser");
         btnReset.setMaxWidth(Double.MAX_VALUE);
         btnReset.setOnAction(e -> {
@@ -359,8 +361,8 @@ public class SimulationView extends Application implements Observer {
 
         // ── Sandbox speed slider ─────────────────────────────────────────────
         // Same logic as the real simulation slider:
-        // the value listener only updates the label (visual feedback while dragging),
-        // and sandboxChangeSpeed() is called only on MouseReleased.
+        // the valueProperty().addListener only updates the label (visual feedback while dragging),
+        // and controller.sandboxChangeSpeed() is called only on setOnMouseReleased -> it's to avoid calling the controller too many times while dragging the slider
         Slider sandboxSpeedSlider = new Slider(1, 10, 1);
         sandboxSpeedSlider.setShowTickLabels(true);
         sandboxSpeedSlider.setMajorTickUnit(3);
@@ -392,7 +394,7 @@ public class SimulationView extends Application implements Observer {
         // the error handling live during the presentation.
         VBox testBox = buildTestPanel(regionCombo, cityCombo);
 
-        panel.getChildren().addAll(
+        panel.getChildren().addAll( // list of buttons and labels in the left panel, here to add buttons simulation
             sectionLabel("🧪 Simulateur"),
             sandboxStepLabel,
             sectionLabel("Temps"),
@@ -576,7 +578,7 @@ public class SimulationView extends Application implements Observer {
         messageLabel.setWrapText(true);
         messageLabel.setMaxWidth(140);
 
-        panel.getChildren().addAll(
+        panel.getChildren().addAll( // here to add buttons and labels in the right panel, same for both tabs
             sectionLabel("Légende"),
             coloredLabel("🟢 Faible  (< 30%)", Color.web("#81c784")),
             coloredLabel("🟠 Modéré (30–60%)", Color.web("#ffb74d")),
@@ -605,14 +607,14 @@ public class SimulationView extends Application implements Observer {
      * @param graphSupplier a lambda that returns the NationalGraph to read
      */
     private void registerClickHandler(MapCanvas canvas,
-                                      java.util.function.Supplier<NationalGraph> graphSupplier) {
+                                      java.util.function.Supplier<NationalGraph> graphSupplier) { // Supplier lets us pass "which graph to read" at click time (not at registration time), allows the sandbox popup to always show sandbox data and the real popup to always show real data at the same time
         canvas.setOnMouseClicked(e -> {
             NationalGraph graph = graphSupplier.get();
             for (String regionName : graph.getRegions().keySet()) {
                 double[] center = canvas.getCircleCenter(regionName);
                 if (center == null) continue;
                 double dist = Math.hypot(e.getX() - center[0], e.getY() - center[1]);
-                if (dist <= canvas.getRadius()) {
+                if (dist <= canvas.getRadius()) { // Clicked inside the region circle
                     Region region = graph.getRegions().get(regionName);
                     openRegionPopup(regionName, region, graph);
                     break;
@@ -635,7 +637,7 @@ public class SimulationView extends Application implements Observer {
         if (openPopup != null && openPopup.isShowing()
                 && regionName.equals(openPopupRegion)
                 && graph == openPopupGraph) {
-            refreshPopup(regionName, region, graph);
+            refreshPopup(regionName, region, graph); // if the same region is already open, just refresh the content
             return;
         }
         if (openPopup != null) openPopup.close();
@@ -644,8 +646,8 @@ public class SimulationView extends Application implements Observer {
         openPopupGraph  = graph;
 
         Stage popup = new Stage();
-        popup.initOwner(primaryStage);
-        popup.initModality(Modality.NONE);
+        popup.initOwner(primaryStage); // Set the main window as the owner of the popup
+        popup.initModality(Modality.NONE); // Allow interaction with the main window while the popup is open, the simulation continues running in the background
         popup.setTitle("Région : " + regionName);
 
         ScrollPane scroll = new ScrollPane();
@@ -666,7 +668,7 @@ public class SimulationView extends Application implements Observer {
         popup.show();
     }
 
-    /** Rebuilds the popup content in place. */
+    /** Rebuilds the popup content in place while the simulation runs : it stills stay opened, only its content change */
     private void refreshPopup(String regionName, Region region, NationalGraph graph) {
         if (openPopup == null || !openPopup.isShowing()) return;
         ScrollPane scroll = (ScrollPane) openPopup.getScene().getUserData();
@@ -698,7 +700,7 @@ public class SimulationView extends Application implements Observer {
             Label nameL = new Label(riskDot(city.getRiskColor()) + "  " + city.getName());
             nameL.setFont(Font.font(13));
             nameL.setTextFill(Color.WHITE);
-
+            // here to change what is displayed in the popup for each city, we can add more info if needed
             Label seirL  = infoLabel("Sains: " + city.getSafe() +
                                      "   Exposés: " + city.getExposed());
             Label seirL2 = infoLabel("Infectés: " + city.getInfected() +
@@ -743,7 +745,7 @@ public class SimulationView extends Application implements Observer {
                 row.getChildren().add(routeL);
 
                 boolean isSandbox = (graph == controller.getSandboxGraph());
-                if (isSandbox || controller.isAdmin()) {
+                if (isSandbox || controller.isAdmin()) { // Only show toggle buttons if the user is admin or if the sandbox is open
                     String btnText = (route.getAccess() == AccessState.BARRICATED)
                         ? "✅ Ouvrir" : "🚧 Bloquer";
                     Button toggleBtn = smallButton(btnText);
@@ -798,7 +800,7 @@ public class SimulationView extends Application implements Observer {
     }
 
     // =========================================================================
-    // Observer — called by the real simulation after each step
+    // Observer — called by the controller after each step of the real simulation
     // =========================================================================
 
     /**
@@ -808,7 +810,7 @@ public class SimulationView extends Application implements Observer {
      */
     @Override
     public void update() {
-        Platform.runLater(() -> {
+        Platform.runLater(() -> { // Ensure we are on the JavaFX Application Thread, runLater is needed because the controller may call update() from a non-JavaFX thread
             realMap.draw(controller.getNationalGraph());
 
             // Refresh popup if it is showing real data

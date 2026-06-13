@@ -53,7 +53,7 @@ public class Region {
             this.riskColor = Color.GREEN;
             return;
         }
-
+        // here we calculate the macro rate of infection in the region and set the risk color accordingly, we can also change the "seuil" if needed
         double macroRate = (double) this.totalInfected / totalPop;
         if (macroRate < 0.3) {
             this.riskColor = Color.GREEN;

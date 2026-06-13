@@ -1,0 +1,837 @@
+{
+    "currentStep": 0,
+    "regions": [
+        {
+            "routes": [
+                {
+                    "cityA": "Rennes",
+                    "cityB": "Brest",
+                    "access": "OPEN",
+                    "weight": 1.817811275819412
+                },
+                {
+                    "cityA": "Brest",
+                    "cityB": "Lorient",
+                    "access": "OPEN",
+                    "weight": 1.5693728870179868
+                },
+                {
+                    "cityA": "Lorient",
+                    "cityB": "Vannes",
+                    "access": "OPEN",
+                    "weight": 1.6147713971530497
+                },
+                {
+                    "cityA": "Vannes",
+                    "cityB": "Rennes",
+                    "access": "OPEN",
+                    "weight": 1.4974009021575219
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 2081,
+                    "recovered": 267,
+                    "name": "Rennes",
+                    "safe": 39780,
+                    "riskColor": "GREEN",
+                    "exposed": 683
+                },
+                {
+                    "infected": 1678,
+                    "recovered": 853,
+                    "name": "Brest",
+                    "safe": 47120,
+                    "riskColor": "GREEN",
+                    "exposed": 985
+                },
+                {
+                    "infected": 1323,
+                    "recovered": 803,
+                    "name": "Vannes",
+                    "safe": 65164,
+                    "riskColor": "GREEN",
+                    "exposed": 647
+                },
+                {
+                    "infected": 1234,
+                    "recovered": 829,
+                    "name": "Lorient",
+                    "safe": 74529,
+                    "riskColor": "GREEN",
+                    "exposed": 133
+                }
+            ],
+            "name": "Bretagne",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Lille",
+                    "cityB": "Amiens",
+                    "access": "OPEN",
+                    "weight": 1.4919734264853697
+                },
+                {
+                    "cityA": "Amiens",
+                    "cityB": "Roubaix",
+                    "access": "OPEN",
+                    "weight": 1.1202186741949562
+                },
+                {
+                    "cityA": "Roubaix",
+                    "cityB": "Tourcoing",
+                    "access": "OPEN",
+                    "weight": 1.9786405938819969
+                },
+                {
+                    "cityA": "Tourcoing",
+                    "cityB": "Lille",
+                    "access": "OPEN",
+                    "weight": 1.8946938010619934
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 1397,
+                    "recovered": 579,
+                    "name": "Amiens",
+                    "safe": 84295,
+                    "riskColor": "GREEN",
+                    "exposed": 783
+                },
+                {
+                    "infected": 1490,
+                    "recovered": 306,
+                    "name": "Roubaix",
+                    "safe": 83905,
+                    "riskColor": "GREEN",
+                    "exposed": 739
+                },
+                {
+                    "infected": 718,
+                    "recovered": 278,
+                    "name": "Tourcoing",
+                    "safe": 20491,
+                    "riskColor": "GREEN",
+                    "exposed": 731
+                },
+                {
+                    "infected": 2222,
+                    "recovered": 566,
+                    "name": "Lille",
+                    "safe": 74833,
+                    "riskColor": "GREEN",
+                    "exposed": 414
+                }
+            ],
+            "name": "Hauts-de-France",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Marseille",
+                    "cityB": "Nice",
+                    "access": "OPEN",
+                    "weight": 1.6052984199359055
+                },
+                {
+                    "cityA": "Nice",
+                    "cityB": "Toulon",
+                    "access": "OPEN",
+                    "weight": 1.1637546230555316
+                },
+                {
+                    "cityA": "Toulon",
+                    "cityB": "Avignon",
+                    "access": "OPEN",
+                    "weight": 1.0566969448005081
+                },
+                {
+                    "cityA": "Avignon",
+                    "cityB": "Marseille",
+                    "access": "OPEN",
+                    "weight": 1.525562726003171
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 1962,
+                    "recovered": 845,
+                    "name": "Avignon",
+                    "safe": 63353,
+                    "riskColor": "GREEN",
+                    "exposed": 191
+                },
+                {
+                    "infected": 2064,
+                    "recovered": 889,
+                    "name": "Marseille",
+                    "safe": 81689,
+                    "riskColor": "GREEN",
+                    "exposed": 285
+                },
+                {
+                    "infected": 840,
+                    "recovered": 331,
+                    "name": "Nice",
+                    "safe": 90554,
+                    "riskColor": "GREEN",
+                    "exposed": 522
+                },
+                {
+                    "infected": 891,
+                    "recovered": 432,
+                    "name": "Toulon",
+                    "safe": 47888,
+                    "riskColor": "GREEN",
+                    "exposed": 184
+                }
+            ],
+            "name": "PACA",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Orléans",
+                    "cityB": "Tours",
+                    "access": "OPEN",
+                    "weight": 1.7664910028972445
+                },
+                {
+                    "cityA": "Tours",
+                    "cityB": "Bourges",
+                    "access": "OPEN",
+                    "weight": 1.1586310800454434
+                },
+                {
+                    "cityA": "Bourges",
+                    "cityB": "Blois",
+                    "access": "OPEN",
+                    "weight": 1.4740472383674565
+                },
+                {
+                    "cityA": "Blois",
+                    "cityB": "Orléans",
+                    "access": "OPEN",
+                    "weight": 1.1570735437926896
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 2222,
+                    "recovered": 519,
+                    "name": "Bourges",
+                    "safe": 85689,
+                    "riskColor": "GREEN",
+                    "exposed": 144
+                },
+                {
+                    "infected": 2456,
+                    "recovered": 482,
+                    "name": "Orléans",
+                    "safe": 50542,
+                    "riskColor": "GREEN",
+                    "exposed": 494
+                },
+                {
+                    "infected": 2389,
+                    "recovered": 954,
+                    "name": "Tours",
+                    "safe": 62269,
+                    "riskColor": "GREEN",
+                    "exposed": 599
+                },
+                {
+                    "infected": 664,
+                    "recovered": 856,
+                    "name": "Blois",
+                    "safe": 25741,
+                    "riskColor": "GREEN",
+                    "exposed": 950
+                }
+            ],
+            "name": "Centre-Val de Loire",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Nantes",
+                    "cityB": "Angers",
+                    "access": "OPEN",
+                    "weight": 1.105083863454523
+                },
+                {
+                    "cityA": "Angers",
+                    "cityB": "Le Mans",
+                    "access": "OPEN",
+                    "weight": 1.2997241607861825
+                },
+                {
+                    "cityA": "Le Mans",
+                    "cityB": "Saint-Nazaire",
+                    "access": "OPEN",
+                    "weight": 1.2085976605906472
+                },
+                {
+                    "cityA": "Saint-Nazaire",
+                    "cityB": "Nantes",
+                    "access": "OPEN",
+                    "weight": 1.000449997150267
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 840,
+                    "recovered": 500,
+                    "name": "Nantes",
+                    "safe": 115456,
+                    "riskColor": "GREEN",
+                    "exposed": 335
+                },
+                {
+                    "infected": 1951,
+                    "recovered": 689,
+                    "name": "Angers",
+                    "safe": 112219,
+                    "riskColor": "GREEN",
+                    "exposed": 800
+                },
+                {
+                    "infected": 1317,
+                    "recovered": 212,
+                    "name": "Saint-Nazaire",
+                    "safe": 107014,
+                    "riskColor": "GREEN",
+                    "exposed": 629
+                },
+                {
+                    "infected": 1420,
+                    "recovered": 938,
+                    "name": "Le Mans",
+                    "safe": 100182,
+                    "riskColor": "GREEN",
+                    "exposed": 585
+                }
+            ],
+            "name": "Pays de la Loire",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Strasbourg",
+                    "cityB": "Reims",
+                    "access": "OPEN",
+                    "weight": 1.9809506259879486
+                },
+                {
+                    "cityA": "Reims",
+                    "cityB": "Metz",
+                    "access": "OPEN",
+                    "weight": 1.7414561727349174
+                },
+                {
+                    "cityA": "Metz",
+                    "cityB": "Nancy",
+                    "access": "OPEN",
+                    "weight": 1.5532629714802113
+                },
+                {
+                    "cityA": "Nancy",
+                    "cityB": "Strasbourg",
+                    "access": "OPEN",
+                    "weight": 1.6801260943711638
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 555,
+                    "recovered": 218,
+                    "name": "Strasbourg",
+                    "safe": 35593,
+                    "riskColor": "GREEN",
+                    "exposed": 935
+                },
+                {
+                    "infected": 903,
+                    "recovered": 394,
+                    "name": "Nancy",
+                    "safe": 36710,
+                    "riskColor": "GREEN",
+                    "exposed": 773
+                },
+                {
+                    "infected": 1286,
+                    "recovered": 837,
+                    "name": "Metz",
+                    "safe": 82422,
+                    "riskColor": "GREEN",
+                    "exposed": 427
+                },
+                {
+                    "infected": 2472,
+                    "recovered": 308,
+                    "name": "Reims",
+                    "safe": 20948,
+                    "riskColor": "GREEN",
+                    "exposed": 349
+                }
+            ],
+            "name": "Grand Est",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Dijon",
+                    "cityB": "Besançon",
+                    "access": "OPEN",
+                    "weight": 1.9521829930948118
+                },
+                {
+                    "cityA": "Besançon",
+                    "cityB": "Belfort",
+                    "access": "OPEN",
+                    "weight": 1.3852769053547656
+                },
+                {
+                    "cityA": "Belfort",
+                    "cityB": "Chalon",
+                    "access": "OPEN",
+                    "weight": 1.9121950063135196
+                },
+                {
+                    "cityA": "Chalon",
+                    "cityB": "Dijon",
+                    "access": "OPEN",
+                    "weight": 1.5898575766904974
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 2048,
+                    "recovered": 872,
+                    "name": "Belfort",
+                    "safe": 71826,
+                    "riskColor": "GREEN",
+                    "exposed": 870
+                },
+                {
+                    "infected": 818,
+                    "recovered": 696,
+                    "name": "Chalon",
+                    "safe": 98834,
+                    "riskColor": "GREEN",
+                    "exposed": 829
+                },
+                {
+                    "infected": 575,
+                    "recovered": 550,
+                    "name": "Besançon",
+                    "safe": 78021,
+                    "riskColor": "GREEN",
+                    "exposed": 389
+                },
+                {
+                    "infected": 1946,
+                    "recovered": 559,
+                    "name": "Dijon",
+                    "safe": 115212,
+                    "riskColor": "GREEN",
+                    "exposed": 910
+                }
+            ],
+            "name": "Bourgogne-Franche-Comté",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Paris",
+                    "cityB": "Versailles",
+                    "access": "OPEN",
+                    "weight": 1.776842096987047
+                },
+                {
+                    "cityA": "Versailles",
+                    "cityB": "Évry",
+                    "access": "OPEN",
+                    "weight": 1.4080771852318623
+                },
+                {
+                    "cityA": "Évry",
+                    "cityB": "Marne",
+                    "access": "OPEN",
+                    "weight": 1.855896281043383
+                },
+                {
+                    "cityA": "Marne",
+                    "cityB": "Paris",
+                    "access": "OPEN",
+                    "weight": 1.7366993525046501
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 2473,
+                    "recovered": 678,
+                    "name": "Versailles",
+                    "safe": 67749,
+                    "riskColor": "GREEN",
+                    "exposed": 402
+                },
+                {
+                    "infected": 734,
+                    "recovered": 648,
+                    "name": "Évry",
+                    "safe": 87349,
+                    "riskColor": "GREEN",
+                    "exposed": 642
+                },
+                {
+                    "infected": 1593,
+                    "recovered": 421,
+                    "name": "Paris",
+                    "safe": 42740,
+                    "riskColor": "GREEN",
+                    "exposed": 547
+                },
+                {
+                    "infected": 1880,
+                    "recovered": 748,
+                    "name": "Marne",
+                    "safe": 100477,
+                    "riskColor": "GREEN",
+                    "exposed": 387
+                }
+            ],
+            "name": "Île-de-France",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Rouen",
+                    "cityB": "Caen",
+                    "access": "OPEN",
+                    "weight": 1.405281126120125
+                },
+                {
+                    "cityA": "Caen",
+                    "cityB": "Le Havre",
+                    "access": "OPEN",
+                    "weight": 1.9076744916285717
+                },
+                {
+                    "cityA": "Le Havre",
+                    "cityB": "Cherbourg",
+                    "access": "OPEN",
+                    "weight": 1.4934087919294041
+                },
+                {
+                    "cityA": "Cherbourg",
+                    "cityB": "Rouen",
+                    "access": "OPEN",
+                    "weight": 1.2736472110236368
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 1014,
+                    "recovered": 807,
+                    "name": "Cherbourg",
+                    "safe": 45519,
+                    "riskColor": "GREEN",
+                    "exposed": 677
+                },
+                {
+                    "infected": 1252,
+                    "recovered": 383,
+                    "name": "Rouen",
+                    "safe": 38342,
+                    "riskColor": "GREEN",
+                    "exposed": 617
+                },
+                {
+                    "infected": 1021,
+                    "recovered": 864,
+                    "name": "Le Havre",
+                    "safe": 58380,
+                    "riskColor": "GREEN",
+                    "exposed": 345
+                },
+                {
+                    "infected": 818,
+                    "recovered": 409,
+                    "name": "Caen",
+                    "safe": 68343,
+                    "riskColor": "GREEN",
+                    "exposed": 108
+                }
+            ],
+            "name": "Normandie",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Bordeaux",
+                    "cityB": "Limoges",
+                    "access": "OPEN",
+                    "weight": 1.8064195333571011
+                },
+                {
+                    "cityA": "Limoges",
+                    "cityB": "Poitiers",
+                    "access": "OPEN",
+                    "weight": 1.0664954822147803
+                },
+                {
+                    "cityA": "Poitiers",
+                    "cityB": "Pau",
+                    "access": "OPEN",
+                    "weight": 1.0431211513901648
+                },
+                {
+                    "cityA": "Pau",
+                    "cityB": "Bordeaux",
+                    "access": "OPEN",
+                    "weight": 1.1522056103071292
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 1439,
+                    "recovered": 280,
+                    "name": "Bordeaux",
+                    "safe": 50911,
+                    "riskColor": "GREEN",
+                    "exposed": 513
+                },
+                {
+                    "infected": 1583,
+                    "recovered": 373,
+                    "name": "Poitiers",
+                    "safe": 30623,
+                    "riskColor": "GREEN",
+                    "exposed": 963
+                },
+                {
+                    "infected": 2430,
+                    "recovered": 922,
+                    "name": "Pau",
+                    "safe": 77630,
+                    "riskColor": "GREEN",
+                    "exposed": 887
+                },
+                {
+                    "infected": 518,
+                    "recovered": 247,
+                    "name": "Limoges",
+                    "safe": 34592,
+                    "riskColor": "GREEN",
+                    "exposed": 378
+                }
+            ],
+            "name": "Nouvelle-Aquitaine",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Toulouse",
+                    "cityB": "Montpellier",
+                    "access": "OPEN",
+                    "weight": 1.702252276675777
+                },
+                {
+                    "cityA": "Montpellier",
+                    "cityB": "Nîmes",
+                    "access": "OPEN",
+                    "weight": 1.0685457784530565
+                },
+                {
+                    "cityA": "Nîmes",
+                    "cityB": "Perpignan",
+                    "access": "OPEN",
+                    "weight": 1.6477158907321918
+                },
+                {
+                    "cityA": "Perpignan",
+                    "cityB": "Toulouse",
+                    "access": "OPEN",
+                    "weight": 1.4020055509600704
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 2275,
+                    "recovered": 971,
+                    "name": "Montpellier",
+                    "safe": 24848,
+                    "riskColor": "GREEN",
+                    "exposed": 644
+                },
+                {
+                    "infected": 1994,
+                    "recovered": 834,
+                    "name": "Nîmes",
+                    "safe": 118008,
+                    "riskColor": "GREEN",
+                    "exposed": 107
+                },
+                {
+                    "infected": 1667,
+                    "recovered": 521,
+                    "name": "Toulouse",
+                    "safe": 30492,
+                    "riskColor": "GREEN",
+                    "exposed": 195
+                },
+                {
+                    "infected": 968,
+                    "recovered": 919,
+                    "name": "Perpignan",
+                    "safe": 28757,
+                    "riskColor": "GREEN",
+                    "exposed": 105
+                }
+            ],
+            "name": "Occitanie",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Lyon",
+                    "cityB": "Saint-Étienne",
+                    "access": "OPEN",
+                    "weight": 1.2264340354122651
+                },
+                {
+                    "cityA": "Saint-Étienne",
+                    "cityB": "Grenoble",
+                    "access": "OPEN",
+                    "weight": 1.9761838274165027
+                },
+                {
+                    "cityA": "Grenoble",
+                    "cityB": "Clermont",
+                    "access": "OPEN",
+                    "weight": 1.0238241981524472
+                },
+                {
+                    "cityA": "Clermont",
+                    "cityB": "Lyon",
+                    "access": "OPEN",
+                    "weight": 1.7890050833797022
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 1544,
+                    "recovered": 518,
+                    "name": "Grenoble",
+                    "safe": 22916,
+                    "riskColor": "GREEN",
+                    "exposed": 697
+                },
+                {
+                    "infected": 1381,
+                    "recovered": 226,
+                    "name": "Lyon",
+                    "safe": 40726,
+                    "riskColor": "GREEN",
+                    "exposed": 898
+                },
+                {
+                    "infected": 1801,
+                    "recovered": 258,
+                    "name": "Saint-Étienne",
+                    "safe": 119746,
+                    "riskColor": "GREEN",
+                    "exposed": 717
+                },
+                {
+                    "infected": 2008,
+                    "recovered": 730,
+                    "name": "Clermont",
+                    "safe": 41286,
+                    "riskColor": "GREEN",
+                    "exposed": 770
+                }
+            ],
+            "name": "Auvergne-Rhône-Alpes",
+            "riskColor": "GREEN"
+        },
+        {
+            "routes": [
+                {
+                    "cityA": "Ajaccio",
+                    "cityB": "Bastia",
+                    "access": "OPEN",
+                    "weight": 1.5348808906329001
+                },
+                {
+                    "cityA": "Bastia",
+                    "cityB": "Calvi",
+                    "access": "OPEN",
+                    "weight": 1.149531662184231
+                },
+                {
+                    "cityA": "Calvi",
+                    "cityB": "Corte",
+                    "access": "OPEN",
+                    "weight": 1.188236127014508
+                },
+                {
+                    "cityA": "Corte",
+                    "cityB": "Ajaccio",
+                    "access": "OPEN",
+                    "weight": 1.1444858141868524
+                }
+            ],
+            "cities": [
+                {
+                    "infected": 2256,
+                    "recovered": 348,
+                    "name": "Ajaccio",
+                    "safe": 73174,
+                    "riskColor": "GREEN",
+                    "exposed": 251
+                },
+                {
+                    "infected": 2035,
+                    "recovered": 732,
+                    "name": "Corte",
+                    "safe": 69840,
+                    "riskColor": "GREEN",
+                    "exposed": 625
+                },
+                {
+                    "infected": 1759,
+                    "recovered": 420,
+                    "name": "Bastia",
+                    "safe": 57893,
+                    "riskColor": "GREEN",
+                    "exposed": 206
+                },
+                {
+                    "infected": 1938,
+                    "recovered": 668,
+                    "name": "Calvi",
+                    "safe": 30630,
+                    "riskColor": "GREEN",
+                    "exposed": 428
+                }
+            ],
+            "name": "Corse",
+            "riskColor": "GREEN"
+        }
+    ]
+}
