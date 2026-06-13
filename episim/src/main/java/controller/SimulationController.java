@@ -261,5 +261,232 @@ public class SimulationController {
         }
         return graph;
     }
-}
 
+    // =========================================================================
+    // SANDBOX — independent copy of the data for the Simulator tab
+    // =========================================================================
+
+    /**
+     * History log of all events triggered in the sandbox.
+     * Each entry is a human-readable string: "Jour X — action".
+     * The view displays this list and updates it after every event.
+     */
+    private final java.util.List<String> sandboxHistory = new java.util.ArrayList<>();
+
+    /** Deep copy of the real graph used as sandbox. */
+    private models.graph.NationalGraph sandboxGraph;
+
+    /** Step counter for the sandbox (independent from the real simulation). */
+    private int sandboxStep = 0;
+
+    /**
+     * Returns the sandbox graph.
+     * Created lazily on first call — at that point the real graph is already
+     * fully populated by buildTestData(), so the copy is complete.
+     */
+    /**
+     * Returns the sandbox graph.
+     * Created lazily on first call — the real graph is fully populated by then.
+     * sandboxStep is initialised to the real simulation's current day so that
+     * "Jour X (sandbox)" can be directly compared to "Jour X (réel)".
+     */
+    public models.graph.NationalGraph getSandboxGraph() {
+        if (sandboxGraph == null) {
+            sandboxGraph = model.getNationalGraph().deepCopy();
+            sandboxStep  = model.getTotalDays(); // sync start day with real sim
+        }
+        return sandboxGraph;
+    }
+
+    /** @return number of steps run in the sandbox so far */
+    public int getSandboxStep() { return sandboxStep; }
+
+    /**
+     * Advances the sandbox by one step.
+     * Uses the same engine and config as the real simulation —
+     * only the data (NationalGraph) is different.
+     */
+    public void sandboxStep() {
+        captureSnapshotIfNeeded(); // take "before" snapshot on very first step
+        sandboxStep++;
+        for (models.entities.Region region : getSandboxGraph().getRegions().values()) {
+            engine.computeLocalSEIR(region, config);
+            engine.computeInterCityFlux(region, config);
+            region.totalInfectedGraph();
+        }
+        engine.checkAndApplyBarricades(getSandboxGraph());
+    }
+
+    /**
+     * Triggers a random outbreak in the sandbox graph only.
+     * @return name of the city where the outbreak was triggered
+     */
+    /**
+     * Triggers a random outbreak in the sandbox graph only.
+     * Records the event in the sandbox history log.
+     * @return name of the city where the outbreak was triggered
+     */
+    public String sandboxRandomEvent() {
+        String city = model.getScenarioManager().generateRandomEvent(getSandboxGraph());
+        String name = city != null ? city : "inconnue";
+        sandboxHistory.add(0, "Jour " + sandboxStep + " — ⚡ Foyer : " + name);
+        return name;
+    }
+
+    /**
+     * Manually injects infected cases into a sandbox city.
+     *
+     * @param regionName target region name
+     * @param cityName   target city name
+     * @param count      number of new infected cases to inject
+     */
+    /**
+     * Manually injects infected cases into a sandbox city.
+     *
+     * The ScenarioManager moves `count` people from safe → infected.
+     * We then call updateColor() on the city so its risk color reflects
+     * the new infection rate immediately, and totalInfectedGraph() to
+     * recompute the region-level total and color.
+     * The next sandboxStep() call will propagate these cases via the SEIR engine.
+     *
+     * @param regionName target region name
+     * @param cityName   target city name
+     * @param count      number of new infected cases to inject
+     */
+    public void sandboxInject(String regionName, String cityName, int count) {
+        models.entities.Region region = getSandboxGraph().getRegions().get(regionName);
+        if (region == null) return;
+        models.entities.City city = region.getRegionalGraph().getCities().get(cityName);
+        if (city == null) return;
+        model.getScenarioManager().triggerManualInfection(city, count);
+        city.updateColor();          // reflect new infection rate on city dot
+        region.totalInfectedGraph(); // recompute region total + region color
+        // Record in history so the view can display it
+        sandboxHistory.add(0, "Jour " + sandboxStep + " — 💉 " + count + " cas injectés à " + cityName);
+    }
+
+    /**
+     * Resets the sandbox by making a fresh deep copy of the current real graph.
+     * The sandbox step counter is also reset to zero.
+     */
+    /**
+     * Resets the sandbox by making a fresh deep copy of the CURRENT real graph.
+     * sandboxStep is re-synced to the real simulation's current day so the
+     * comparison "sandbox vs réel" stays meaningful after a reset.
+     */
+    public void resetSandbox() {
+        sandboxGraph = model.getNationalGraph().deepCopy();
+        sandboxStep  = model.getTotalDays(); // re-sync on reset too
+        sandboxHistory.clear();
+        sandboxSnapshot = null; // reset snapshot so next step captures fresh baseline
+        sandboxHistory.add(0, "↺ Sandbox réinitialisée au jour " + sandboxStep);
+    }
+
+    /** @return unmodifiable view of the sandbox event history (most recent first). */
+    public java.util.List<String> getSandboxHistory() {
+        return java.util.Collections.unmodifiableList(sandboxHistory);
+    }
+
+
+    // Sandbox timeline — mirrors the real one but drives sandboxStep()
+    private javafx.animation.Timeline sandboxTimeline;
+    private boolean sandboxRunning = false;
+
+    /**
+     * Builds (or rebuilds) the sandbox Timeline at the given speed.
+     * Same pattern as buildTimeline() for the real simulation:
+     * we always create a fresh Timeline instead of mutating an existing one.
+     *
+     * @param factor steps per second
+     */
+    private void buildSandboxTimeline(double factor) {
+        double safeFactor = Math.max(0.1, factor);
+        sandboxTimeline = new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(
+                javafx.util.Duration.seconds(1.0 / safeFactor),
+                e -> {
+                    sandboxStep();
+
+                    // Notify the view to redraw the sandbox map
+                    view.refreshSandboxMap();
+                }
+            )
+        );
+        sandboxTimeline.setCycleCount(javafx.animation.Timeline.INDEFINITE);
+    }
+
+    /**
+     * Toggles the sandbox simulation between Play and Pause.
+     *
+     * @return true if the sandbox is now running, false if it is now paused
+     */
+    public boolean toggleSandboxPlayPause() {
+        sandboxRunning = !sandboxRunning;
+        if (sandboxRunning) {
+            if (sandboxTimeline == null) buildSandboxTimeline(1.0);
+            sandboxTimeline.play();
+        } else {
+            if (sandboxTimeline != null) sandboxTimeline.stop();
+        }
+        return sandboxRunning;
+    }
+
+    /**
+     * Changes the sandbox simulation speed.
+     * Stops the current timeline, builds a new one, resumes if it was running.
+     *
+     * @param factor steps per second
+     */
+    public void sandboxChangeSpeed(double factor) {
+        boolean wasRunning = sandboxRunning;
+        if (sandboxTimeline != null) sandboxTimeline.stop();
+        buildSandboxTimeline(factor);
+        if (wasRunning) sandboxTimeline.play();
+    }
+
+    // =========================================================================
+    // Sandbox snapshot — Before / After comparison
+    // =========================================================================
+
+    /**
+     * Snapshot of infected counts per region taken when the sandbox was
+     * first initialised (or last reset).  Stored as region name → infected count.
+     * Captured once so we always compare against the same baseline.
+     */
+    private java.util.Map<String, Integer> sandboxSnapshot = null;
+
+    /**
+     * Captures the "before" snapshot if not already done.
+     * Called automatically on the first sandboxStep() so the snapshot
+     * always reflects the state at step 0, not after changes.
+     */
+    private void captureSnapshotIfNeeded() {
+        if (sandboxSnapshot != null) return; // already captured
+        sandboxSnapshot = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, models.entities.Region> entry
+                : getSandboxGraph().getRegions().entrySet()) {
+            sandboxSnapshot.put(entry.getKey(), entry.getValue().getTotalInfected());
+        }
+    }
+
+    /**
+     * Returns a map of regionName → [infectésBefore, infectésAfter].
+     * "Before" is the snapshot taken at sandbox creation / last reset.
+     * "After"  is the current sandbox state.
+     * Called by the view to build the BarChart report.
+     *
+     * @return ordered map (same order as REGION_POS in MapCanvas)
+     */
+    public java.util.Map<String, int[]> getSandboxBeforeAfter() {
+        java.util.Map<String, int[]> result = new java.util.LinkedHashMap<>();
+        if (sandboxSnapshot == null) return result; // no step run yet
+
+        for (java.util.Map.Entry<String, models.entities.Region> entry
+                : getSandboxGraph().getRegions().entrySet()) {
+            String name   = entry.getKey();
+            int before    = sandboxSnapshot.getOrDefault(name, 0);
+            int after     = entry.getValue().getTotalInfected();
+            result.put(name, new int[]{before, after});
+        }
+        return result;
+    }}
