@@ -4,11 +4,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import models.entities.City;
 import models.entities.Region;
 import models.entities.Route;
 import models.types.AccessState;
-import models.types.Color;
 
 /**
  * The national-level graph of regions and inter-regional routes.
@@ -40,7 +40,14 @@ public class NationalGraph {
         this.interRegionalRoutes = new ArrayList<>();
     }
 
+    /**
+     * @throws IllegalArgumentException if region is null or already registered
+     */
     public void addRegion(Region region) {
+        if (region == null)
+            throw new IllegalArgumentException("Cannot add a null region.");
+        if (regions.containsKey(region.getName()))
+            throw new IllegalArgumentException("Region already registered: " + region.getName());
         this.regions.put(region.getName(), region);
     }
 
@@ -55,7 +62,17 @@ public class NationalGraph {
      * @param cityB  city in region Y
      * @param weight traffic intensity (higher = more people travel = faster spread)
      */
+    /**
+     * @throws IllegalArgumentException if either city is null or weight <= 0
+     * @throws IllegalStateException    if both cities belong to the same region
+     *                                  (use RegionalGraph.addBiRoute for intra-regional)
+     */
     public void addInterRegionalRoute(City cityA, City cityB, double weight) {
+        if (cityA == null || cityB == null)
+            throw new IllegalArgumentException("Cities must not be null for an inter-regional route.");
+        if (weight <= 0)
+            throw new IllegalArgumentException("Inter-regional route weight must be > 0, got: " + weight);
+        // Route constructor also validates — this guard gives a clearer message
         interRegionalRoutes.add(new Route(cityA, cityB, weight, AccessState.OPEN));
     }
 

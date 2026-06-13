@@ -1,16 +1,27 @@
 package view;
 
 import controller.SimulationController;
+import exceptions.SimulationSaveException;
 import interfaces.Observer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Separator;
+import javafx.scene.control.Slider;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
-import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import models.entities.City;
@@ -18,9 +29,6 @@ import models.entities.Region;
 import models.entities.Route;
 import models.graph.NationalGraph;
 import models.types.AccessState;
-
-import java.io.File;
-import java.util.Map;
 
 /**
  * Main JavaFX view — Epidemic Simulation.
@@ -153,7 +161,7 @@ public class SimulationView extends Application implements Observer {
 
         // Info label explaining the tab's purpose
         Label infoLbl = new Label(
-            "Données en temps réel.\nVeuillez accéder au simulateur pour tester des scénarios et voir leurs effets sur la simulation."
+            "📡 Données en temps réel. La simulation tourne automatiquement."
         );
         infoLbl.setTextFill(Color.LIGHTGRAY);
         infoLbl.setFont(Font.font(11));
@@ -320,10 +328,15 @@ public class SimulationView extends Application implements Observer {
                 showSandboxMessage("⚠ Choisir une région et une ville.");
                 return;
             }
-            controller.sandboxInject(regionName, cityName, count);
-            sandboxMap.draw(controller.getSandboxGraph());
-            refreshHistoryBox();
-            showSandboxMessage("💉 " + count + " cas injectés à " + cityName);
+            try {
+                controller.sandboxInject(regionName, cityName, count);
+                sandboxMap.draw(controller.getSandboxGraph());
+                refreshHistoryBox();
+                showSandboxMessage("💉 " + count + " cas injectés à " + cityName);
+            } catch (exceptions.InvalidParameterException | exceptions.CityStateException ex) {
+                // Controller validation failed — show message, don't crash
+                showSandboxMessage("⚠ " + ex.getMessage());
+            }
         });
 
         // ── Sandbox speed slider ─────────────────────────────────────────────
@@ -801,7 +814,7 @@ public class SimulationView extends Application implements Observer {
 
         // Populate one bar pair per region
         for (java.util.Map.Entry<String, int[]> entry : data.entrySet()) {
-            String shortName = entry.getKey().split("[\\s\\-–]")[0];
+            String shortName = entry.getKey().split("[ -]")[0];
             int before = entry.getValue()[0];
             int after  = entry.getValue()[1];
             seriesBefore.getData().add(
@@ -857,8 +870,8 @@ public class SimulationView extends Application implements Observer {
         });
 
         // Summary label: total infected delta
-        int totalBefore = data.values().stream().mapToInt(v -> v[0]).sum();
-        int totalAfter  = data.values().stream().mapToInt(v -> v[1]).sum();
+        int totalBefore = data.values().stream().mapToInt(arr -> arr[0]).sum();
+        int totalAfter  = data.values().stream().mapToInt(arr -> arr[1]).sum();
         int delta       = totalAfter - totalBefore;
         String deltaText = (delta >= 0 ? "+" : "") + delta;
 
@@ -876,7 +889,7 @@ public class SimulationView extends Application implements Observer {
         // chart's internal CSS (title colour, grid lines) stays intact.
         reportContent.setStyle("-fx-background-color: #1a1a2e;");
         reportContent.setPadding(new Insets(10));
-        javafx.scene.layout.VBox.setVgrow(chart, javafx.scene.layout.Priority.ALWAYS);
+        VBox.setVgrow(chart, Priority.ALWAYS);
 
         // Add or replace the "Rapport" tab in the main TabPane
         TabPane tabs = (TabPane) primaryStage.getScene().getRoot();
@@ -889,17 +902,27 @@ public class SimulationView extends Application implements Observer {
         showSandboxMessage("📊 Rapport généré pour " + data.size() + " régions.");
     }
 
+    /**
+     * Saves the simulation to a fixed directory: saves/ at the project root.
+     * The filename is auto-generated with a timestamp so each save is unique.
+     *
+     * The user never chooses the path — this keeps saves organised and avoids
+     * accidental overwrites in random folders.
+     *
+     * @throws SimulationSaveException if the save directory cannot be created
+     *                                 or the file cannot be written
+     */
     private void handleSave() {
-        if (!controller.isAdmin()) { showMessage("⚠ Sauvegarde réservée à l'Admin."); return; }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Sauvegarder la simulation");
-        chooser.getExtensionFilters().add(
-            new FileChooser.ExtensionFilter("Fichier JSON", "*.json"));
-        File file = chooser.showSaveDialog(primaryStage);
-        if (file != null) {
-            controller.getSimulationModel().getPersistenceManager()
-                .save(controller.getSimulationModel(), file.getAbsolutePath());
-            showMessage("💾 Sauvegardé : " + file.getName());
+        if (!controller.isAdmin()) {
+            showMessage("⚠ Sauvegarde réservée à l'Admin.");
+            return;
+        }
+        try {
+            controller.saveSimulation();
+            showMessage("💾 Simulation sauvegardée dans le dossier saves/");
+        } catch (SimulationSaveException e) {
+            showMessage("⚠ Erreur de sauvegarde : " + e.getMessage());
+            System.err.println("[SAVE] " + e.getMessage());
         }
     }
 

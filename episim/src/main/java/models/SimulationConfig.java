@@ -1,5 +1,7 @@
 package models;
 
+import exceptions.InvalidParameterException;
+
 public class SimulationConfig {
 
     // ── Paramètres épidémiologiques COVID-19 ──────────────────────────────────
@@ -30,28 +32,64 @@ public class SimulationConfig {
     public double getTransmissionRate() {
         return transmissionRate;
     }
+    /**
+     * @throws IllegalArgumentException if value is not in [0.0, 1.0]
+     */
+    /**
+     * @throws InvalidParameterException if value is not in [0.0, 1.0]
+     */
     public void setTransmissionRate(double transmissionRate) {
+        if (transmissionRate < 0.0 || transmissionRate > 1.0)
+            throw new InvalidParameterException("transmissionRate", String.valueOf(transmissionRate),
+                "Transmission rate must be in [0.0, 1.0], got: " + transmissionRate);
         this.transmissionRate = transmissionRate;
     }
 
     public double getIncubationRate() {
         return incubationRate;
     }
+    /**
+     * @throws IllegalArgumentException if value is not in [0.0, 1.0]
+     */
+    /**
+     * @throws InvalidParameterException if value is not in [0.0, 1.0]
+     */
     public void setIncubationRate(double incubationRate) {
+        if (incubationRate < 0.0 || incubationRate > 1.0)
+            throw new InvalidParameterException("incubationRate", String.valueOf(incubationRate),
+                "Incubation rate must be in [0.0, 1.0], got: " + incubationRate);
         this.incubationRate = incubationRate;
     }
 
     public double getRecoveryRate() {
         return recoveryRate;
     }
+    /**
+     * @throws IllegalArgumentException if value is not in [0.0, 1.0]
+     */
+    /**
+     * @throws InvalidParameterException if value is not in [0.0, 1.0]
+     */
     public void setRecoveryRate(double recoveryRate) {
+        if (recoveryRate < 0.0 || recoveryRate > 1.0)
+            throw new InvalidParameterException("recoveryRate", String.valueOf(recoveryRate),
+                "Recovery rate must be in [0.0, 1.0], got: " + recoveryRate);
         this.recoveryRate = recoveryRate;
     }
 
     public double getMortalityRate() {
         return mortalityRate;
     }
+    /**
+     * @throws IllegalArgumentException if value is not in [0.0, 1.0]
+     */
+    /**
+     * @throws InvalidParameterException if value is not in [0.0, 1.0]
+     */
     public void setMortalityRate(double mortalityRate) {
+        if (mortalityRate < 0.0 || mortalityRate > 1.0)
+            throw new InvalidParameterException("mortalityRate", String.valueOf(mortalityRate),
+                "Mortality rate must be in [0.0, 1.0], got: " + mortalityRate);
         this.mortalityRate = mortalityRate;
     }
 

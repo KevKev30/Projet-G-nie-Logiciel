@@ -16,7 +16,14 @@ public class Route {
      * @param weight the weight of the route
      * @param access the access of the route
      */
+    /**
+     * @throws IllegalArgumentException if weight <= 0 or either city is null
+     */
     public Route(City cityA, City cityB, double weight, AccessState access){
+        if (cityA == null || cityB == null)
+            throw new IllegalArgumentException("Route cities must not be null.");
+        if (weight <= 0)
+            throw new IllegalArgumentException("Route weight must be > 0, got: " + weight);
         this.cityA = cityA;
         this.cityB = cityB;
         this.weight = weight;

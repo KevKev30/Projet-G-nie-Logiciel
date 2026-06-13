@@ -1,5 +1,6 @@
 package models.entities;
 
+import exceptions.CityStateException;
 import models.types.Color;
 
 public class City{
@@ -71,15 +72,30 @@ public class City{
         return (double) this.populationInfected / total;
     }
 
-    public void setSafe(int count) { 
+    /**
+     * @throws IllegalArgumentException if count is negative
+     */
+    public void setSafe(int count) {
+        if (count < 0) throw new CityStateException(name,
+            "Safe population cannot be negative: " + count); 
         this.populationSafe = count; 
     }
 
-    public void setExposed(int count) { 
+    /**
+     * @throws IllegalArgumentException if count is negative
+     */
+    public void setExposed(int count) {
+        if (count < 0) throw new CityStateException(name,
+            "Exposed count cannot be negative: " + count); 
         this.populationExposed = count; 
     }
 
-    public void setInfected(int count) { 
+    /**
+     * @throws IllegalArgumentException if count is negative
+     */
+    public void setInfected(int count) {
+        if (count < 0) throw new CityStateException(name,
+            "Infected count cannot be negative: " + count); 
         this.populationInfected = count; 
     }
 

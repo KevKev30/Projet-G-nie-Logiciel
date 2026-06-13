@@ -1,5 +1,21 @@
 package controller;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiFunction;
+
+import exceptions.CityStateException;
+import exceptions.InvalidParameterException;
+import exceptions.SimulationSaveException;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
@@ -15,15 +31,40 @@ import models.types.AccessState;
 import models.types.Color;
 import view.SimulationView;
 
+/**
+ * Main controller for the epidemic simulation (MVC pattern).
+ *
+ * Responsibilities:
+ *   - drives the real simulation via a JavaFX Timeline
+ *   - drives the sandbox simulation via a separate Timeline
+ *   - handles admin actions (route toggle, city color, virus injection)
+ *   - manages sandbox state (deep copy, history, before/after snapshot)
+ *   - saves the simulation to a fixed directory
+ */
 public class SimulationController {
 
-    private SimulationModel model;
+    // ── Core objects ──────────────────────────────────────────────────────────
+    private SimulationModel  model;
     private SimulationEngine engine;
     private SimulationConfig config;
-    private SimulationView view;
+    private SimulationView   view;
+
+    // ── Real simulation timeline ───────────────────────────────────────────────
     private Timeline timeline;
-    private boolean isRunning;
-    private double speedFactor;
+    private boolean  isRunning;
+    private double   speedFactor;
+
+    // ── Sandbox state ─────────────────────────────────────────────────────────
+    private NationalGraph        sandboxGraph;
+    private int                  sandboxStep    = 0;
+    private boolean              sandboxRunning = false;
+    private Timeline             sandboxTimeline;
+    private final List<String>   sandboxHistory = new ArrayList<>();
+    private Map<String, Integer> sandboxSnapshot = null;
+
+    // =========================================================================
+    // Constructor
+    // =========================================================================
 
     public SimulationController(SimulationView view) {
         this.view        = view;
@@ -35,32 +76,33 @@ public class SimulationController {
         this.config = model.getConfig();
 
         this.model.setNationalGraph(buildTestData());
-
-        buildTimeline(speedFactor); // create the initial timeline
+        buildTimeline(speedFactor);
     }
 
-    // ── Timeline ──────────────────────────────────────────────────────────────
+    // =========================================================================
+    // Real simulation timeline
+    // =========================================================================
 
     /**
-     * Creates a brand-new Timeline at the given speed and stores it.
-     * We NEVER mutate an existing Timeline's KeyFrames — JavaFX doesn't
-     * support that reliably on a running timeline.  Instead we always
-     * stop the old one, throw it away, and create a fresh one.
+     * Creates a fresh Timeline at the given speed.
+     * We never mutate an existing Timeline's KeyFrames — JavaFX doesn't
+     * support that reliably on a running timeline.
      *
-     * @param factor steps per second (e.g. 3.0 = 3 steps/second)
+     * @param factor steps per second
      */
     private void buildTimeline(double factor) {
-        // Guard: factor must be > 0 to avoid Division-by-zero / infinite delay
-        double safeFactor = Math.max(0.1, factor);
-
+        double safe = Math.max(0.1, factor);
         timeline = new Timeline(
-            new KeyFrame(Duration.seconds(1.0 / safeFactor), e -> stepForward())
+            new KeyFrame(Duration.seconds(1.0 / safe), e -> stepForward())
         );
         timeline.setCycleCount(Timeline.INDEFINITE);
     }
 
-    // ── Authentication ────────────────────────────────────────────────────────
+    // =========================================================================
+    // Authentication
+    // =========================================================================
 
+    /** Logs in as admin and notifies the view. */
     public void loginAsAdmin() {
         model.setCurrentUser(new User("admin", User.Role.ADMIN));
         view.showMessage("Connecté en tant qu'Admin");
@@ -68,6 +110,7 @@ public class SimulationController {
         view.update();
     }
 
+    /** Logs in as a standard user and notifies the view. */
     public void loginAsLambda() {
         model.setCurrentUser(new User("guest", User.Role.LAMBDA));
         view.showMessage("Connecté en tant qu'Utilisateur");
@@ -75,12 +118,16 @@ public class SimulationController {
         view.update();
     }
 
+    /** @return true if the current user has admin privileges */
     public boolean isAdmin() {
         return model.getCurrentUser().isAdmin();
     }
 
-    // ── Simulation ────────────────────────────────────────────────────────────
+    // =========================================================================
+    // Real simulation control
+    // =========================================================================
 
+    /** Toggles the real simulation between play and pause. */
     public void togglePlayPause() {
         isRunning = !isRunning;
         model.setRunning(isRunning);
@@ -95,50 +142,46 @@ public class SimulationController {
         }
     }
 
+    /**
+     * Advances the real simulation by one step.
+     * Order: local SEIR → intra-regional flux → inter-regional flux → barricades.
+     */
     public void stepForward() {
         model.setCurrentStep(model.getCurrentStep() + 1);
-
         for (Region region : model.getNationalGraph().getRegions().values()) {
             engine.computeLocalSEIR(region, config);
             engine.computeInterCityFlux(region, config);
             region.totalInfectedGraph();
         }
-
-        // Inter-regional spread — cities in adjacent regions contaminate each other
         engine.computeInterRegionalFlux(model.getNationalGraph(), config);
         engine.checkAndApplyBarricades(model.getNationalGraph());
         view.update();
     }
 
     /**
-     * Changes the simulation speed.
+     * Changes the real simulation speed.
+     * Stops the old timeline, builds a fresh one, resumes if it was playing.
      *
-     * FIX: instead of mutating the existing Timeline's KeyFrames (unreliable),
-     * we stop it, discard it, and build a fresh one at the new speed.
-     * If the simulation was running we restart it immediately.
-     *
-     * @param factor steps per second
+     * @param factor steps per second — must be in [0.1, 60]
+     * @throws InvalidParameterException if factor is out of range
      */
     public void changeSpeed(double factor) {
+        if (factor < 0.1 || factor > 60)
+            throw new InvalidParameterException("speedFactor", String.valueOf(factor),
+                "Speed factor must be between 0.1 and 60, got: " + factor);
         this.speedFactor = factor;
         config.setSpeedFactor(factor);
-
         boolean wasRunning = isRunning;
-
-        // 1. Stop the old timeline completely
         timeline.stop();
-
-        // 2. Build a brand-new one at the requested speed
         buildTimeline(factor);
-
-        // 3. Resume if it was playing before
-        if (wasRunning) {
-            timeline.play();
-        }
+        if (wasRunning) timeline.play();
     }
 
-    // ── Admin actions ─────────────────────────────────────────────────────────
+    // =========================================================================
+    // Admin actions
+    // =========================================================================
 
+    /** Sets the risk color of a city (admin only). */
     public void setCityColor(String regionName, String cityName, Color color) {
         if (!isAdmin()) { view.showMessage("Action réservée à l'Admin !"); return; }
         City city = getCity(regionName, cityName);
@@ -149,11 +192,11 @@ public class SimulationController {
         }
     }
 
+    /** Toggles a route between OPEN and BARRICATED (admin only). */
     public void toggleRoute(String regionName, String cityA, String cityB) {
         if (!isAdmin()) { view.showMessage("Action réservée à l'Admin !"); return; }
         Region region = model.getNationalGraph().getRegions().get(regionName);
         if (region == null) return;
-
         for (Route route : region.getRegionalGraph().getRoutes()) {
             boolean match =
                 (route.getCityA().getName().equals(cityA) && route.getCityB().getName().equals(cityB)) ||
@@ -172,21 +215,23 @@ public class SimulationController {
         }
     }
 
+    /** Barricades all routes connected to a given city. */
     public void blockRoutesForCity(Region region, String cityName) {
         for (Route route : region.getRegionalGraph().getRoutesForCity(cityName)) {
             route.setAccess(AccessState.BARRICATED);
         }
     }
 
+    /** Triggers a random outbreak in the real simulation. */
     public void generateRandomEvent() {
         String cityName = model.triggerRandomOutbreak();
-        if (cityName != null) {
-            view.showMessage("⚡ Nouveau foyer COVID détecté à " + cityName + " !");
-        } else {
+        if (cityName != null)
+            view.showMessage("⚡ Nouveau foyer détecté à " + cityName + " !");
+        else
             view.showMessage("⚡ Aucune ville disponible pour un nouveau foyer.");
-        }
     }
 
+    /** Injects virus cases into a real city (admin only). */
     public void injectVirus(String regionName, String cityName, int count) {
         if (!isAdmin()) { view.showMessage("Action réservée à l'Admin !"); return; }
         City city = getCity(regionName, cityName);
@@ -196,20 +241,291 @@ public class SimulationController {
         }
     }
 
-    // ── Getters ───────────────────────────────────────────────────────────────
+    // =========================================================================
+    // Save
+    // =========================================================================
 
+    /**
+     * Saves the simulation to the saves/ directory (auto-created if needed).
+     * Filename: episim_YYYY-MM-DD_HH-mm-ss.json — unique per second, no overwrite.
+     *
+     * @throws SimulationSaveException if the directory or file cannot be written
+     */
+    public void saveSimulation() throws SimulationSaveException {
+        Path saveDir = Paths.get("saves");
+        try {
+            Files.createDirectories(saveDir);
+        } catch (java.io.IOException e) {
+            throw new SimulationSaveException(saveDir.toString(),
+                "Cannot create save directory", e);
+        }
+        String timestamp = LocalDateTime.now()
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+        Path filePath = saveDir.resolve("episim_" + timestamp + ".json");
+        try {
+            model.getPersistenceManager().save(model, filePath.toString());
+        } catch (Exception e) {
+            throw new SimulationSaveException(filePath.toString(),
+                "Failed to write simulation file", e);
+        }
+    }
+
+    // =========================================================================
+    // Getters
+    // =========================================================================
+
+    /** @return the real NationalGraph */
     public NationalGraph getNationalGraph() { return model.getNationalGraph(); }
 
+    /**
+     * Returns a city by region + city name from the REAL graph.
+     * @return the City, or null if not found
+     */
     public City getCity(String regionName, String cityName) {
         Region region = model.getNationalGraph().getRegions().get(regionName);
         if (region == null) return null;
         return region.getRegionalGraph().getCities().get(cityName);
     }
 
-    public SimulationModel getSimulationModel() { return this.model; }
+    /** @return the simulation model (for timer, persistence, etc.) */
+    public SimulationModel getSimulationModel() { return model; }
 
-    // ── Test data ─────────────────────────────────────────────────────────────
+    // =========================================================================
+    // Sandbox — independent simulation for the Simulator tab
+    // =========================================================================
 
+    /**
+     * Returns the sandbox NationalGraph, creating it on first call.
+     *
+     * The sandbox is a deep copy of the real graph taken at the moment the
+     * user first opens the Simulator tab.  sandboxStep is synced to the real
+     * simulation's current day so the two timelines are comparable.
+     */
+    public NationalGraph getSandboxGraph() {
+        if (sandboxGraph == null) {
+            sandboxGraph = model.getNationalGraph().deepCopy();
+            sandboxStep  = model.getTotalDays();
+        }
+        return sandboxGraph;
+    }
+
+    /** @return number of steps run in the sandbox */
+    public int getSandboxStep() { return sandboxStep; }
+
+    /**
+     * Advances the sandbox by one step using the same engine and config as
+     * the real simulation.  Only the NationalGraph differs.
+     */
+    public void sandboxStep() {
+        captureSnapshotIfNeeded();
+        sandboxStep++;
+        for (Region region : getSandboxGraph().getRegions().values()) {
+            engine.computeLocalSEIR(region, config);
+            engine.computeInterCityFlux(region, config);
+            region.totalInfectedGraph();
+        }
+        engine.computeInterRegionalFlux(getSandboxGraph(), config);
+        engine.checkAndApplyBarricades(getSandboxGraph());
+    }
+
+    /**
+     * Triggers a random outbreak in the sandbox only.
+     * Records the event in the sandbox history.
+     *
+     * @return name of the city where the outbreak was triggered
+     */
+    public String sandboxRandomEvent() {
+        String city = model.getScenarioManager().generateRandomEvent(getSandboxGraph());
+        String name = (city != null) ? city : "inconnue";
+        sandboxHistory.add(0, "Jour " + sandboxStep + " — ⚡ Foyer : " + name);
+        return name;
+    }
+
+    /**
+     * Manually injects cases into a sandbox city.
+     * Moves people from safe → infected, updates colors, logs the event.
+     *
+     * @param regionName target region
+     * @param cityName   target city
+     * @param count      number of cases to inject — must be > 0
+     * @throws InvalidParameterException if regionName, cityName, or count is invalid
+     * @throws CityStateException        if the city has no safe population left
+     */
+    public void sandboxInject(String regionName, String cityName, int count) {
+        if (regionName == null || regionName.isBlank())
+            throw new InvalidParameterException("regionName", regionName,
+                "Region name must not be blank.");
+        if (cityName == null || cityName.isBlank())
+            throw new InvalidParameterException("cityName", cityName,
+                "City name must not be blank.");
+        if (count <= 0)
+            throw new InvalidParameterException("count", String.valueOf(count),
+                "Injection count must be > 0, got: " + count);
+
+        Region region = getSandboxGraph().getRegions().get(regionName);
+        if (region == null) return;
+        City city = region.getRegionalGraph().getCities().get(cityName);
+        if (city == null) return;
+
+        if (city.getSafe() <= 0)
+            throw new CityStateException(cityName, "No safe population left to infect.");
+
+        model.getScenarioManager().triggerManualInfection(city, count);
+        city.updateColor();
+        region.totalInfectedGraph();
+        sandboxHistory.add(0, "Jour " + sandboxStep + " — 💉 "
+            + count + " cas injectés à " + cityName);
+    }
+
+    /**
+     * Resets the sandbox: fresh deep copy of the current real graph,
+     * step counter re-synced, history and snapshot cleared.
+     */
+    public void resetSandbox() {
+        sandboxGraph    = model.getNationalGraph().deepCopy();
+        sandboxStep     = model.getTotalDays();
+        sandboxSnapshot = null;
+        sandboxHistory.clear();
+        sandboxHistory.add(0, "↺ Sandbox réinitialisée au jour " + sandboxStep);
+    }
+
+    /** @return unmodifiable sandbox event history, most recent first */
+    public List<String> getSandboxHistory() {
+        return Collections.unmodifiableList(sandboxHistory);
+    }
+
+    // ── Sandbox timeline ──────────────────────────────────────────────────────
+
+    /**
+     * Builds a fresh sandbox Timeline at the given speed.
+     * Same pattern as buildTimeline() — never mutate, always recreate.
+     */
+    private void buildSandboxTimeline(double factor) {
+        double safe = Math.max(0.1, factor);
+        sandboxTimeline = new Timeline(
+            new KeyFrame(Duration.seconds(1.0 / safe), e -> {
+                sandboxStep();
+                view.refreshSandboxMap();
+            })
+        );
+        sandboxTimeline.setCycleCount(Timeline.INDEFINITE);
+    }
+
+    /**
+     * Toggles the sandbox timeline between play and pause.
+     *
+     * @return true if the sandbox is now running
+     */
+    public boolean toggleSandboxPlayPause() {
+        sandboxRunning = !sandboxRunning;
+        if (sandboxRunning) {
+            if (sandboxTimeline == null) buildSandboxTimeline(1.0);
+            sandboxTimeline.play();
+        } else {
+            if (sandboxTimeline != null) sandboxTimeline.stop();
+        }
+        return sandboxRunning;
+    }
+
+    /**
+     * Changes the sandbox speed.
+     *
+     * @param factor steps per second — must be in [0.1, 60]
+     * @throws InvalidParameterException if factor is out of range
+     */
+    public void sandboxChangeSpeed(double factor) {
+        if (factor < 0.1 || factor > 60)
+            throw new InvalidParameterException("speedFactor", String.valueOf(factor),
+                "Speed factor must be between 0.1 and 60, got: " + factor);
+        boolean wasRunning = sandboxRunning;
+        if (sandboxTimeline != null) sandboxTimeline.stop();
+        buildSandboxTimeline(factor);
+        if (wasRunning) sandboxTimeline.play();
+    }
+
+    // ── Sandbox snapshot (before/after report) ────────────────────────────────
+
+    /**
+     * Takes the "before" snapshot on the first sandboxStep() call.
+     * Records infected counts per region at that moment.
+     */
+    private void captureSnapshotIfNeeded() {
+        if (sandboxSnapshot != null) return;
+        sandboxSnapshot = new LinkedHashMap<>();
+        for (Map.Entry<String, Region> entry : getSandboxGraph().getRegions().entrySet()) {
+            sandboxSnapshot.put(entry.getKey(), entry.getValue().getTotalInfected());
+        }
+    }
+
+    /**
+     * Returns before/after infected counts per region for the report chart.
+     * "Before" = snapshot at first step. "After" = current state.
+     *
+     * @return map of regionName → [infectésBefore, infectésAfter], empty if no step run yet
+     */
+    public Map<String, int[]> getSandboxBeforeAfter() {
+        Map<String, int[]> result = new LinkedHashMap<>();
+        if (sandboxSnapshot == null) return result;
+        for (Map.Entry<String, Region> entry : getSandboxGraph().getRegions().entrySet()) {
+            String name  = entry.getKey();
+            int before   = sandboxSnapshot.getOrDefault(name, 0);
+            int after    = entry.getValue().getTotalInfected();
+            result.put(name, new int[]{before, after});
+        }
+        return result;
+    }
+
+    // ── Inter-regional route helpers (used by the region popup) ───────────────
+
+    /**
+     * Returns inter-regional routes that have at least one endpoint in the given region.
+     * Used by the view to populate the "Routes inter-régionales" section of the popup.
+     *
+     * @param regionName region to filter on
+     * @param graph      the NationalGraph to query (real or sandbox)
+     */
+    public List<Route> getInterRegionalRoutesFor(String regionName, NationalGraph graph) {
+        List<Route> result = new ArrayList<>();
+        Region region = graph.getRegions().get(regionName);
+        if (region == null) return result;
+        Set<String> cityNames = region.getRegionalGraph().getCities().keySet();
+        for (Route route : graph.getInterRegionalRoutes()) {
+            if (cityNames.contains(route.getCityA().getName())
+                    || cityNames.contains(route.getCityB().getName())) {
+                result.add(route);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns the name of the region that contains the given city.
+     * Used by the popup to label routes as "Paris (Île-de-France) ↔ Amiens (Hauts-de-France)".
+     *
+     * @param city  city to look up
+     * @param graph the NationalGraph to search
+     * @return region name, or "?" if not found
+     */
+    public String getRegionOf(City city, NationalGraph graph) {
+        for (Map.Entry<String, Region> entry : graph.getRegions().entrySet()) {
+            if (entry.getValue().getRegionalGraph().getCities().containsKey(city.getName()))
+                return entry.getKey();
+        }
+        return "?";
+    }
+
+    // =========================================================================
+    // Test data
+    // =========================================================================
+
+    /**
+     * Builds the initial NationalGraph with 13 French regions, 4 cities each,
+     * intra-regional routes, and 16 inter-regional routes following real French geography.
+     *
+     * Population scale: 20 000–120 000 per city so SEIR dynamics are visible.
+     * With only hundreds, the (int) truncation in SEIR kills fractional transitions
+     * and infection rates never reach the RED threshold.
+     */
     private NationalGraph buildTestData() {
         NationalGraph graph = new NationalGraph();
         java.util.Random rand = new java.util.Random();
@@ -221,7 +537,7 @@ public class SimulationController {
             "Pays de la Loire", "Bourgogne-Franche-Comté", "Corse"
         };
 
-        java.util.Map<String, String[]> regionalCities = new java.util.HashMap<>();
+        Map<String, String[]> regionalCities = new java.util.HashMap<>();
         regionalCities.put("Île-de-France",           new String[]{"Paris", "Versailles", "Évry", "Marne"});
         regionalCities.put("Bretagne",                new String[]{"Rennes", "Brest", "Lorient", "Vannes"});
         regionalCities.put("PACA",                    new String[]{"Marseille", "Nice", "Toulon", "Avignon"});
@@ -242,389 +558,62 @@ public class SimulationController {
             City[] cityObjects = new City[cities.length];
 
             for (int i = 0; i < cities.length; i++) {
-                int safe      = 300 + rand.nextInt(500);
-                int exposed   = 5   + rand.nextInt(45);
-                int infected  = 10  + rand.nextInt(190);
-                int recovered = 10  + rand.nextInt(90);
+                int safe      = 20_000 + rand.nextInt(100_000);
+                int exposed   = 100    + rand.nextInt(900);
+                int infected  = 500    + rand.nextInt(2_000);
+                int recovered = 200    + rand.nextInt(800);
                 cityObjects[i] = new City(cities[i], safe, exposed, infected, recovered, Color.GREEN);
                 cityObjects[i].updateColor();
                 region.getRegionalGraph().addCity(cityObjects[i]);
             }
-
             for (int i = 0; i < cityObjects.length; i++) {
                 City current = cityObjects[i];
                 City next    = cityObjects[(i + 1) % cityObjects.length];
-                double weight = 1.0 + rand.nextDouble();
-                region.getRegionalGraph().addBiRoute(current, next, weight);
+                region.getRegionalGraph().addBiRoute(current, next, 1.0 + rand.nextDouble());
             }
-
             region.totalInfectedGraph();
             graph.addRegion(region);
         }
-        // ── Inter-regional routes ─────────────────────────────────────────────
-        // Each line connects a "gateway" city from one region to a gateway city
-        // in an adjacent region, following real French geography.
-        // Weight represents traffic intensity (higher = more travellers = faster spread).
-        // All routes start OPEN and can be barricaded by the Admin or automatically.
-        //
-        // Helper lambda to get a city object from the graph by region+city name.
-        java.util.function.BiFunction<String, String, models.entities.City> getCity =
-            (regionName, cityName) -> graph.getRegions().get(regionName)
-                                          .getRegionalGraph().getCities().get(cityName);
 
-        // Hauts-de-France ↔ Île-de-France  (Amiens → Paris, main A1 corridor)
-        graph.addInterRegionalRoute(getCity.apply("Hauts-de-France", "Amiens"),
-                                    getCity.apply("Île-de-France",   "Paris"),    2.0);
+        // Inter-regional routes: gateway cities following real French road network.
+        // All routes start OPEN. Weight = relative traffic intensity.
+        BiFunction<String, String, City> gc =
+            (r, c) -> graph.getRegions().get(r).getRegionalGraph().getCities().get(c);
 
-        // Normandie ↔ Île-de-France  (Rouen → Paris, A13)
-        graph.addInterRegionalRoute(getCity.apply("Normandie",      "Rouen"),
-                                    getCity.apply("Île-de-France",  "Paris"),     1.5);
-
-        // Normandie ↔ Bretagne  (Caen → Rennes)
-        graph.addInterRegionalRoute(getCity.apply("Normandie",  "Caen"),
-                                    getCity.apply("Bretagne",   "Rennes"),        1.2);
-
-        // Bretagne ↔ Pays de la Loire  (Rennes → Nantes)
-        graph.addInterRegionalRoute(getCity.apply("Bretagne",         "Rennes"),
-                                    getCity.apply("Pays de la Loire", "Nantes"),  1.8);
-
-        // Pays de la Loire ↔ Centre-Val de Loire  (Angers → Tours)
-        graph.addInterRegionalRoute(getCity.apply("Pays de la Loire",    "Angers"),
-                                    getCity.apply("Centre-Val de Loire", "Tours"), 1.3);
-
-        // Centre-Val de Loire ↔ Île-de-France  (Orléans → Paris)
-        graph.addInterRegionalRoute(getCity.apply("Centre-Val de Loire", "Orléans"),
-                                    getCity.apply("Île-de-France",       "Paris"),  1.8);
-
-        // Île-de-France ↔ Grand Est  (Marne → Reims, A4)
-        graph.addInterRegionalRoute(getCity.apply("Île-de-France", "Marne"),
-                                    getCity.apply("Grand Est",     "Reims"),       1.6);
-
-        // Grand Est ↔ Bourgogne-Franche-Comté  (Belfort → Strasbourg)
-        graph.addInterRegionalRoute(getCity.apply("Grand Est",                 "Strasbourg"),
-                                    getCity.apply("Bourgogne-Franche-Comté",   "Belfort"),  1.1);
-
-        // Bourgogne-Franche-Comté ↔ Auvergne-Rhône-Alpes  (Dijon → Lyon)
-        graph.addInterRegionalRoute(getCity.apply("Bourgogne-Franche-Comté", "Dijon"),
-                                    getCity.apply("Auvergne-Rhône-Alpes",    "Lyon"),  1.7);
-
-        // Auvergne-Rhône-Alpes ↔ PACA  (Grenoble → Marseille via A51)
-        graph.addInterRegionalRoute(getCity.apply("Auvergne-Rhône-Alpes", "Grenoble"),
-                                    getCity.apply("PACA",                  "Marseille"), 1.4);
-
-        // PACA ↔ Occitanie  (Avignon → Nîmes, A9)
-        graph.addInterRegionalRoute(getCity.apply("PACA",      "Avignon"),
-                                    getCity.apply("Occitanie", "Nîmes"),              1.5);
-
-        // Occitanie ↔ Nouvelle-Aquitaine  (Toulouse → Bordeaux, A62)
-        graph.addInterRegionalRoute(getCity.apply("Occitanie",          "Toulouse"),
-                                    getCity.apply("Nouvelle-Aquitaine", "Bordeaux"),  1.6);
-
-        // Nouvelle-Aquitaine ↔ Centre-Val de Loire  (Poitiers → Tours, A10)
-        graph.addInterRegionalRoute(getCity.apply("Nouvelle-Aquitaine",   "Poitiers"),
-                                    getCity.apply("Centre-Val de Loire",  "Tours"),   1.3);
-
-        // Nouvelle-Aquitaine ↔ Auvergne-Rhône-Alpes  (Limoges → Clermont, A89)
-        graph.addInterRegionalRoute(getCity.apply("Nouvelle-Aquitaine",    "Limoges"),
-                                    getCity.apply("Auvergne-Rhône-Alpes", "Clermont"), 1.0);
-
-        // Centre-Val de Loire ↔ Bourgogne-Franche-Comté  (Bourges → Dijon)
-        graph.addInterRegionalRoute(getCity.apply("Centre-Val de Loire",   "Bourges"),
-                                    getCity.apply("Bourgogne-Franche-Comté", "Dijon"), 1.0);
-
-        // Auvergne-Rhône-Alpes ↔ Occitanie  (Clermont → Montpellier, A75)
-        graph.addInterRegionalRoute(getCity.apply("Auvergne-Rhône-Alpes", "Clermont"),
-                                    getCity.apply("Occitanie",             "Montpellier"), 1.2);
-
-        // Corse is isolated — no inter-regional routes (island)
+        graph.addInterRegionalRoute(gc.apply("Hauts-de-France",  "Amiens"),
+                                    gc.apply("Île-de-France",    "Paris"),       2.0);
+        graph.addInterRegionalRoute(gc.apply("Normandie",        "Rouen"),
+                                    gc.apply("Île-de-France",    "Paris"),       1.5);
+        graph.addInterRegionalRoute(gc.apply("Normandie",        "Caen"),
+                                    gc.apply("Bretagne",         "Rennes"),      1.2);
+        graph.addInterRegionalRoute(gc.apply("Bretagne",         "Rennes"),
+                                    gc.apply("Pays de la Loire", "Nantes"),      1.8);
+        graph.addInterRegionalRoute(gc.apply("Pays de la Loire",    "Angers"),
+                                    gc.apply("Centre-Val de Loire", "Tours"),    1.3);
+        graph.addInterRegionalRoute(gc.apply("Centre-Val de Loire", "Orléans"),
+                                    gc.apply("Île-de-France",       "Paris"),    1.8);
+        graph.addInterRegionalRoute(gc.apply("Île-de-France",       "Marne"),
+                                    gc.apply("Grand Est",           "Reims"),    1.6);
+        graph.addInterRegionalRoute(gc.apply("Grand Est",                "Strasbourg"),
+                                    gc.apply("Bourgogne-Franche-Comté", "Belfort"), 1.1);
+        graph.addInterRegionalRoute(gc.apply("Bourgogne-Franche-Comté", "Dijon"),
+                                    gc.apply("Auvergne-Rhône-Alpes",    "Lyon"),    1.7);
+        graph.addInterRegionalRoute(gc.apply("Auvergne-Rhône-Alpes", "Grenoble"),
+                                    gc.apply("PACA",                 "Marseille"), 1.4);
+        graph.addInterRegionalRoute(gc.apply("PACA",       "Avignon"),
+                                    gc.apply("Occitanie",  "Nîmes"),              1.5);
+        graph.addInterRegionalRoute(gc.apply("Occitanie",           "Toulouse"),
+                                    gc.apply("Nouvelle-Aquitaine",  "Bordeaux"),  1.6);
+        graph.addInterRegionalRoute(gc.apply("Nouvelle-Aquitaine",   "Poitiers"),
+                                    gc.apply("Centre-Val de Loire",  "Tours"),    1.3);
+        graph.addInterRegionalRoute(gc.apply("Nouvelle-Aquitaine",    "Limoges"),
+                                    gc.apply("Auvergne-Rhône-Alpes", "Clermont"), 1.0);
+        graph.addInterRegionalRoute(gc.apply("Centre-Val de Loire",    "Bourges"),
+                                    gc.apply("Bourgogne-Franche-Comté", "Dijon"), 1.0);
+        graph.addInterRegionalRoute(gc.apply("Auvergne-Rhône-Alpes", "Clermont"),
+                                    gc.apply("Occitanie",            "Montpellier"), 1.2);
+        // Corse: island — no inter-regional routes.
 
         return graph;
     }
-
-    // =========================================================================
-    // SANDBOX — independent copy of the data for the Simulator tab
-    // =========================================================================
-
-    /**
-     * History log of all events triggered in the sandbox.
-     * Each entry is a human-readable string: "Jour X — action".
-     * The view displays this list and updates it after every event.
-     */
-    private final java.util.List<String> sandboxHistory = new java.util.ArrayList<>();
-
-    /** Deep copy of the real graph used as sandbox. */
-    private models.graph.NationalGraph sandboxGraph;
-
-    /** Step counter for the sandbox (independent from the real simulation). */
-    private int sandboxStep = 0;
-
-    /**
-     * Returns the sandbox graph.
-     * Created lazily on first call — at that point the real graph is already
-     * fully populated by buildTestData(), so the copy is complete.
-     */
-    /**
-     * Returns the sandbox graph.
-     * Created lazily on first call — the real graph is fully populated by then.
-     * sandboxStep is initialised to the real simulation's current day so that
-     * "Jour X (sandbox)" can be directly compared to "Jour X (réel)".
-     */
-    public models.graph.NationalGraph getSandboxGraph() {
-        if (sandboxGraph == null) {
-            sandboxGraph = model.getNationalGraph().deepCopy();
-            sandboxStep  = model.getTotalDays(); // sync start day with real sim
-        }
-        return sandboxGraph;
-    }
-
-    /** @return number of steps run in the sandbox so far */
-    public int getSandboxStep() { return sandboxStep; }
-
-    /**
-     * Advances the sandbox by one step.
-     * Uses the same engine and config as the real simulation —
-     * only the data (NationalGraph) is different.
-     */
-    public void sandboxStep() {
-        captureSnapshotIfNeeded(); // take "before" snapshot on very first step
-        sandboxStep++;
-        for (models.entities.Region region : getSandboxGraph().getRegions().values()) {
-            engine.computeLocalSEIR(region, config);
-            engine.computeInterCityFlux(region, config);
-            region.totalInfectedGraph();
-        }
-        engine.computeInterRegionalFlux(getSandboxGraph(), config);
-        engine.checkAndApplyBarricades(getSandboxGraph());
-    }
-
-    /**
-     * Triggers a random outbreak in the sandbox graph only.
-     * @return name of the city where the outbreak was triggered
-     */
-    /**
-     * Triggers a random outbreak in the sandbox graph only.
-     * Records the event in the sandbox history log.
-     * @return name of the city where the outbreak was triggered
-     */
-    public String sandboxRandomEvent() {
-        String city = model.getScenarioManager().generateRandomEvent(getSandboxGraph());
-        String name = city != null ? city : "inconnue";
-        sandboxHistory.add(0, "Jour " + sandboxStep + " — ⚡ Foyer : " + name);
-        return name;
-    }
-
-    /**
-     * Manually injects infected cases into a sandbox city.
-     *
-     * @param regionName target region name
-     * @param cityName   target city name
-     * @param count      number of new infected cases to inject
-     */
-    /**
-     * Manually injects infected cases into a sandbox city.
-     *
-     * The ScenarioManager moves `count` people from safe → infected.
-     * We then call updateColor() on the city so its risk color reflects
-     * the new infection rate immediately, and totalInfectedGraph() to
-     * recompute the region-level total and color.
-     * The next sandboxStep() call will propagate these cases via the SEIR engine.
-     *
-     * @param regionName target region name
-     * @param cityName   target city name
-     * @param count      number of new infected cases to inject
-     */
-    public void sandboxInject(String regionName, String cityName, int count) {
-        models.entities.Region region = getSandboxGraph().getRegions().get(regionName);
-        if (region == null) return;
-        models.entities.City city = region.getRegionalGraph().getCities().get(cityName);
-        if (city == null) return;
-        model.getScenarioManager().triggerManualInfection(city, count);
-        city.updateColor();          // reflect new infection rate on city dot
-        region.totalInfectedGraph(); // recompute region total + region color
-        // Record in history so the view can display it
-        sandboxHistory.add(0, "Jour " + sandboxStep + " — 💉 " + count + " cas injectés à " + cityName);
-    }
-
-    /**
-     * Resets the sandbox by making a fresh deep copy of the current real graph.
-     * The sandbox step counter is also reset to zero.
-     */
-    /**
-     * Resets the sandbox by making a fresh deep copy of the CURRENT real graph.
-     * sandboxStep is re-synced to the real simulation's current day so the
-     * comparison "sandbox vs réel" stays meaningful after a reset.
-     */
-    public void resetSandbox() {
-        sandboxGraph = model.getNationalGraph().deepCopy();
-        sandboxStep  = model.getTotalDays(); // re-sync on reset too
-        sandboxHistory.clear();
-        sandboxSnapshot = null; // reset snapshot so next step captures fresh baseline
-        sandboxHistory.add(0, "↺ Sandbox réinitialisée au jour " + sandboxStep);
-    }
-
-    /** @return unmodifiable view of the sandbox event history (most recent first). */
-    public java.util.List<String> getSandboxHistory() {
-        return java.util.Collections.unmodifiableList(sandboxHistory);
-    }
-
-
-    // Sandbox timeline — mirrors the real one but drives sandboxStep()
-    private javafx.animation.Timeline sandboxTimeline;
-    private boolean sandboxRunning = false;
-
-    /**
-     * Builds (or rebuilds) the sandbox Timeline at the given speed.
-     * Same pattern as buildTimeline() for the real simulation:
-     * we always create a fresh Timeline instead of mutating an existing one.
-     *
-     * @param factor steps per second
-     */
-    private void buildSandboxTimeline(double factor) {
-        double safeFactor = Math.max(0.1, factor);
-        sandboxTimeline = new javafx.animation.Timeline(
-            new javafx.animation.KeyFrame(
-                javafx.util.Duration.seconds(1.0 / safeFactor),
-                e -> {
-                    sandboxStep();
-
-                    // Notify the view to redraw the sandbox map
-                    view.refreshSandboxMap();
-                }
-            )
-        );
-        sandboxTimeline.setCycleCount(javafx.animation.Timeline.INDEFINITE);
-    }
-
-    /**
-     * Toggles the sandbox simulation between Play and Pause.
-     *
-     * @return true if the sandbox is now running, false if it is now paused
-     */
-    public boolean toggleSandboxPlayPause() {
-        sandboxRunning = !sandboxRunning;
-        if (sandboxRunning) {
-            if (sandboxTimeline == null) buildSandboxTimeline(1.0);
-            sandboxTimeline.play();
-        } else {
-            if (sandboxTimeline != null) sandboxTimeline.stop();
-        }
-        return sandboxRunning;
-    }
-
-    /**
-     * Changes the sandbox simulation speed.
-     * Stops the current timeline, builds a new one, resumes if it was running.
-     *
-     * @param factor steps per second
-     */
-    public void sandboxChangeSpeed(double factor) {
-        boolean wasRunning = sandboxRunning;
-        if (sandboxTimeline != null) sandboxTimeline.stop();
-        buildSandboxTimeline(factor);
-        if (wasRunning) sandboxTimeline.play();
-    }
-
-    // =========================================================================
-    // Sandbox snapshot — Before / After comparison
-    // =========================================================================
-
-    /**
-     * Snapshot of infected counts per region taken when the sandbox was
-     * first initialised (or last reset).  Stored as region name → infected count.
-     * Captured once so we always compare against the same baseline.
-     */
-    private java.util.Map<String, Integer> sandboxSnapshot = null;
-
-    /**
-     * Captures the "before" snapshot if not already done.
-     * Called automatically on the first sandboxStep() so the snapshot
-     * always reflects the state at step 0, not after changes.
-     */
-    private void captureSnapshotIfNeeded() {
-        if (sandboxSnapshot != null) return; // already captured
-        sandboxSnapshot = new java.util.LinkedHashMap<>();
-        for (java.util.Map.Entry<String, models.entities.Region> entry
-                : getSandboxGraph().getRegions().entrySet()) {
-            sandboxSnapshot.put(entry.getKey(), entry.getValue().getTotalInfected());
-        }
-    }
-
-    /**
-     * Returns a map of regionName → [infectésBefore, infectésAfter].
-     * "Before" is the snapshot taken at sandbox creation / last reset.
-     * "After"  is the current sandbox state.
-     * Called by the view to build the BarChart report.
-     *
-     * @return ordered map (same order as REGION_POS in MapCanvas)
-     */
-    public java.util.Map<String, int[]> getSandboxBeforeAfter() {
-        java.util.Map<String, int[]> result = new java.util.LinkedHashMap<>();
-        if (sandboxSnapshot == null) return result; // no step run yet
-
-        for (java.util.Map.Entry<String, models.entities.Region> entry
-                : getSandboxGraph().getRegions().entrySet()) {
-            String name   = entry.getKey();
-            int before    = sandboxSnapshot.getOrDefault(name, 0);
-            int after     = entry.getValue().getTotalInfected();
-            result.put(name, new int[]{before, after});
-        }
-        return result;
-    }
-
-    // =========================================================================
-    // Inter-regional route helpers — used by the region popup in the view
-    // =========================================================================
-
-    /**
-     * Returns all inter-regional routes that involve at least one city
-     * belonging to the given region.
-     *
-     * The view calls this to populate the "Routes inter-régionales" section
-     * of the region popup, showing only the routes relevant to that region.
-     *
-     * @param regionName the region whose inter-regional routes we want
-     * @param graph      the NationalGraph to query (real or sandbox)
-     * @return list of matching inter-regional routes (may be empty)
-     */
-    public java.util.List<models.entities.Route> getInterRegionalRoutesFor(
-            String regionName, models.graph.NationalGraph graph) {
-
-        java.util.List<models.entities.Route> result = new java.util.ArrayList<>();
-        models.entities.Region region = graph.getRegions().get(regionName);
-        if (region == null) return result;
-
-        // Collect city names that belong to this region for fast lookup
-        java.util.Set<String> cityNames =
-            region.getRegionalGraph().getCities().keySet();
-
-        for (models.entities.Route route : graph.getInterRegionalRoutes()) {
-            boolean aInRegion = cityNames.contains(route.getCityA().getName());
-            boolean bInRegion = cityNames.contains(route.getCityB().getName());
-            // Include if at least one endpoint is in this region
-            if (aInRegion || bInRegion) {
-                result.add(route);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Returns the name of the region that contains the given city.
-     * Used by the popup to label inter-regional routes as
-     * "Paris (Île-de-France) ↔ Amiens (Hauts-de-France)".
-     *
-     * @param city  the city to look up
-     * @param graph the NationalGraph to search
-     * @return region name, or "?" if not found
-     */
-    public String getRegionOf(models.entities.City city,
-                              models.graph.NationalGraph graph) {
-        for (java.util.Map.Entry<String, models.entities.Region> entry
-                : graph.getRegions().entrySet()) {
-            if (entry.getValue().getRegionalGraph()
-                     .getCities().containsKey(city.getName())) {
-                return entry.getKey();
-            }
-        }
-        return "?";
-    }}
+}
