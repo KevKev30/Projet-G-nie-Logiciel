@@ -8,7 +8,7 @@ import interfaces.Observer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
-import javafx.geometry.Priority;
+import javafx.scene.layout.Priority;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -320,16 +320,28 @@ public class SimulationView extends Application implements Observer {
             }
         });
 
-        Spinner<Integer> countSpinner = new Spinner<>(1, 5000, 50, 10);
-        countSpinner.setMaxWidth(Double.MAX_VALUE);
-        countSpinner.setStyle("-fx-background-color: #0f3460; -fx-text-fill: white;");
+        // TextField lets the user type any number freely,
+        // instead of clicking arrows up/down on a Spinner.
+        // We parse and validate the value when "Injecter" is clicked.
+        TextField countField = new TextField("50");
+        countField.setMaxWidth(Double.MAX_VALUE);
+        countField.setStyle("-fx-background-color: #0f3460; -fx-text-fill: white;" +
+                            "-fx-prompt-text-fill: #aaaaaa;");
+        countField.setPromptText("Nombre de cas…");
 
         Button btnInject = actionButton("💉 Injecter");
         btnInject.setMaxWidth(Double.MAX_VALUE);
         btnInject.setOnAction(e -> {
             String regionName = regionCombo.getValue();
             String cityName   = cityCombo.getValue();
-            int    count      = countSpinner.getValue();
+            // Parse the TextField value — show a clear error if not a valid number
+            int count;
+            try {
+                count = Integer.parseInt(countField.getText().trim());
+            } catch (NumberFormatException nfe) {
+                showSandboxMessage("⚠ Nombre invalide : entrez un entier (ex: 300)");
+                return;
+            }
             if (regionName == null || cityName == null) {
                 showSandboxMessage("⚠ Choisir une région et une ville.");
                 return;
@@ -399,7 +411,7 @@ public class SimulationView extends Application implements Observer {
             formTitle,
             infoLabel("Région :"), regionCombo,
             infoLabel("Ville :"),  cityCombo,
-            infoLabel("Cas :"),    countSpinner,
+            infoLabel("Cas :"),    countField,
             btnInject,
             new javafx.scene.control.Separator(),
             sectionLabel("📋 Historique"),
@@ -455,7 +467,7 @@ public class SimulationView extends Application implements Observer {
         });
 
         // ── Test 1 : InvalidParameterException — count = 0 ───────────────────
-        // The spinner minimum is 1 so this is unreachable via normal UI.
+        // The TextField accepts any value, but count=0 is validated in the controller.
         Label lbl1 = infoLabel("① count = 0 → InvalidParameterException");
         Button btn1 = testButton("Lancer ①");
         btn1.setOnAction(e -> {

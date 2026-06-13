@@ -155,7 +155,12 @@ public class SimulationController {
             region.totalInfectedGraph();
         }
         engine.computeInterRegionalFlux(model.getNationalGraph(), config);
-        engine.checkAndApplyBarricades(model.getNationalGraph());
+        // checkAndApplyBarricades returns routes newly barricaded this step.
+        // If any region triggered a quarantine, we show it in the UI.
+        java.util.List<String> blocked = engine.checkAndApplyBarricades(model.getNationalGraph());
+        if (!blocked.isEmpty()) {
+            view.showMessage("🚨 Quarantaine : " + String.join(", ", blocked));
+        }
         view.update();
     }
 
@@ -398,7 +403,10 @@ public class SimulationController {
             region.totalInfectedGraph();
         }
         engine.computeInterRegionalFlux(getSandboxGraph(), config);
-        engine.checkAndApplyBarricades(getSandboxGraph());
+        java.util.List<String> blocked = engine.checkAndApplyBarricades(getSandboxGraph());
+        if (!blocked.isEmpty()) {
+            view.showSandboxMessage("🚨 Quarantaine : " + String.join(", ", blocked));
+        }
     }
 
     /**

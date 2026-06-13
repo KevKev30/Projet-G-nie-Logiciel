@@ -149,28 +149,94 @@ public class SimulationEngine {
      *
      * @param graph the national graph to inspect
      */
-    public void checkAndApplyBarricades(NationalGraph graph) {
-        // Intra-regional routes
+    /**
+     * Automatically barricades routes when infection thresholds are exceeded.
+     *
+     * Two levels of automatic quarantine:
+     *
+     * Level 1 — City level (intra-regional routes):
+     *   If a city exceeds 60% infection rate, every road connected to
+     *   that city inside its region is barricaded.
+     *   This was the original behaviour.
+     *
+     * Level 2 — Region level (inter-regional routes) — NEW:
+     *   If an entire region turns RED (macro infection rate > 60%),
+     *   ALL inter-regional routes that cross this region's border are
+     *   barricaded automatically.
+     *   This models a full regional quarantine — no one enters or leaves.
+     *
+     * When the region recovers below 60%, routes are NOT automatically
+     * reopened (an admin must do that manually), which reflects how
+     * real quarantines work.
+     */
+    /**
+     * Returns the list of inter-regional routes that were NEWLY barricaded
+     * during this call, as "RegionA ↔ RegionB" strings.
+     * The controller uses this list to display quarantine alerts in the UI.
+     */
+    public java.util.List<String> checkAndApplyBarricades(NationalGraph graph) {
+        java.util.List<String> newlyBlocked = new java.util.ArrayList<>();
+
+        // ── Level 1 : city-level barricades on intra-regional routes ─────────
         for (Region region : graph.getRegions().values()) {
             for (Route route : region.getRegionalGraph().getRoutes()) {
-                autoBarricade(route);
+                autoBarricadeByCity(route);
             }
         }
-        // Inter-regional routes
-        for (Route route : graph.getInterRegionalRoutes()) {
-            autoBarricade(route);
+
+        // ── Level 2 : region-level quarantine on inter-regional routes ────────
+        // Build the set of RED region names first (one pass, O(n)).
+        java.util.Set<String> redRegions = new java.util.HashSet<>();
+        for (java.util.Map.Entry<String, Region> entry : graph.getRegions().entrySet()) {
+            if (entry.getValue().getRiskColor() == models.types.Color.RED) {
+                redRegions.add(entry.getKey());
+            }
         }
+
+        // For each inter-regional route, check if either endpoint belongs
+        // to a RED region. If so, block the route (full regional quarantine).
+        for (Route route : graph.getInterRegionalRoutes()) {
+            if (route.getAccess() == AccessState.BARRICATED) continue;
+
+            String regionOfA = findRegionName(graph, route.getCityA());
+            String regionOfB = findRegionName(graph, route.getCityB());
+
+            if (redRegions.contains(regionOfA) || redRegions.contains(regionOfB)) {
+                route.setAccess(AccessState.BARRICATED);
+                // Record which route was blocked so the controller can show it
+                newlyBlocked.add(regionOfA + " ↔ " + regionOfB);
+            }
+        }
+
+        return newlyBlocked;
     }
 
     /**
-     * Barricades a route if either endpoint exceeds the 60% threshold.
-     * Private helper shared by checkAndApplyBarricades().
+     * Barricades a route if either of its cities exceeds 60% infection rate.
+     * Used for intra-regional routes only.
      */
-    private void autoBarricade(Route route) {
+    private void autoBarricadeByCity(Route route) {
         if (route.getAccess() == AccessState.BARRICATED) return;
         if (route.getCityA().getInfectionRate() > 0.6
                 || route.getCityB().getInfectionRate() > 0.6) {
             route.setAccess(AccessState.BARRICATED);
         }
+    }
+
+    /**
+     * Finds the name of the region that contains the given city.
+     * Returns null if the city is not found (should not happen in normal use).
+     *
+     * Simple linear search — called only in checkAndApplyBarricades(),
+     * not in the SEIR hot loop, so performance is not a concern.
+     */
+    private String findRegionName(NationalGraph graph, City city) {
+        for (java.util.Map.Entry<String, Region> entry : graph.getRegions().entrySet()) {
+            if (entry.getValue().getRegionalGraph().getCities()
+                     .containsKey(city.getName())) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 }
