@@ -22,12 +22,12 @@ public class SimulationModel implements Subject {
 
     /**
      * SimulationModel constructor.
-     * Initialise la simulation avec les paramètres épidémiologiques du COVID-19 :
+     * Initializes the simulation with COVID-19 epidemiological parameters:
      *   - transmissionRate = 0.30  → β  (R0 ≈ 2.5–3.5)
-     *   - incubationRate   = 0.14  → σ  (période d'incubation ~7 jours)
-     *   - recoveryRate     = 0.07  → γ  (guérison en ~14 jours)
-     * Les taux de mortalité (2 %) et d'asymptomatiques (40 %) sont définis
-     * dans SimulationConfig.
+     *   - incubationRate   = 0.14  → σ  (incubation period ~7 days)
+     *   - recoveryRate     = 0.07  → γ  (recovery in ~14 days)
+     * Mortality rate (2%) and asymptomatic rate (40%) are defined
+     * in SimulationConfig.
      */
     
     public SimulationModel() {
