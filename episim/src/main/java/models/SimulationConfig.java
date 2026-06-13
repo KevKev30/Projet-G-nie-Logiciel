@@ -4,12 +4,12 @@ import exceptions.InvalidParameterException;
 
 public class SimulationConfig {
 
-    // ── Paramètres épidémiologiques COVID-19 ──────────────────────────────────
-    // β  : taux de transmission       → R0 ≈ 2.5–3.5 pour le SARS-CoV-2
-    // σ  : taux d'incubation          → période d'incubation moyenne ~7 jours  (1/7 ≈ 0.143)
-    // γ  : taux de guérison           → durée de la maladie ~14 jours          (1/14 ≈ 0.071)
-    // μ  : taux de mortalité          → létalité COVID sans vaccination ≈ 2 %
-    // α  : taux d'asymptomatiques     → ~40 % des infectés ne montrent pas de symptômes
+    // ── COVID-19 Epidemiological Parameters ───────────────────────────────────
+    // β  : transmission rate          → R0 ≈ 2.5–3.5 for SARS-CoV-2
+    // σ  : incubation rate            → average incubation period ~7 days  (1/7 ≈ 0.143)
+    // γ  : recovery rate              → disease duration ~14 days          (1/14 ≈ 0.071)
+    // μ  : mortality rate             → COVID fatality rate without vaccination ≈ 2%
+    // α  : asymptomatic rate          → ~40% of infected show no symptoms
 
     private double transmissionRate;    // β
     private double incubationRate;      // σ
@@ -22,8 +22,8 @@ public class SimulationConfig {
         this.transmissionRate   = transmissionRate;
         this.incubationRate     = incubationRate;
         this.recoveryRate       = recoveryRate;
-        this.mortalityRate      = 0.02;   // 2 % de létalité
-        this.asymptomaticRate   = 0.40;   // 40 % d'asymptomatiques
+        this.mortalityRate      = 0.02;   // μ  : mortality rate 
+        this.asymptomaticRate   = 0.40;   // α  : asymptomatic rate  
         this.speedFactor        = 1.0;
     }
 
