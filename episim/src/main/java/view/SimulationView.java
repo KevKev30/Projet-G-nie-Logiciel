@@ -527,37 +527,91 @@ public class SimulationView extends Application implements Observer {
             content.getChildren().add(card);
         }
 
-        content.getChildren().add(sectionLabel("Routes"));
+        // ── Intra-regional routes ─────────────────────────────────────────────
+        content.getChildren().add(sectionLabel("Routes locales"));
 
         for (Route route : region.getRegionalGraph().getRoutes()) {
-            HBox row = new HBox(8);
-            row.setPadding(new Insets(3));
+            content.getChildren().add(buildRouteRow(route, regionName, region, graph));
+        }
 
-            Label routeL = infoLabel(routeIcon(route.getAccess()) + "  " +
-                route.getCityA().getName() + " ↔ " + route.getCityB().getName());
-            HBox.setHgrow(routeL, Priority.ALWAYS);
-            row.getChildren().add(routeL);
+        // ── Inter-regional routes ─────────────────────────────────────────────
+        // Filter the national graph's inter-regional routes to show only those
+        // that have at least one endpoint inside this region.
+        // This lets the user see and control national connections from the
+        // region popup — no need for a separate inter-regional management screen.
+        java.util.List<Route> interRoutes = controller.getInterRegionalRoutesFor(
+            regionName, graph
+        );
 
-            // Toggle button — visible to everyone (sandbox) or admin only (real)
-            boolean isSandbox = (graph == controller.getSandboxGraph());
-            if (isSandbox || controller.isAdmin()) {
-                String btnText = (route.getAccess() == AccessState.BARRICATED)
-                    ? "✅ Ouvrir" : "🚧 Bloquer";
-                Button toggleBtn = smallButton(btnText);
-                toggleBtn.setOnAction(e -> {
-                    route.setAccess(route.getAccess() == AccessState.BARRICATED
-                        ? AccessState.OPEN : AccessState.BARRICATED);
-                    refreshPopup(regionName, region, graph);
-                    if (isSandbox) sandboxMap.draw(controller.getSandboxGraph());
-                    else           realMap.draw(controller.getNationalGraph());
-                });
-                row.getChildren().add(toggleBtn);
+        if (!interRoutes.isEmpty()) {
+            content.getChildren().add(sectionLabel("Routes inter-régionales"));
+
+            for (Route route : interRoutes) {
+                // For inter-regional routes we show both city names AND their regions
+                // so the user understands which two regions are connected.
+                String labelA = route.getCityA().getName() + " (" + controller.getRegionOf(route.getCityA(), graph) + ")";
+                String labelB = route.getCityB().getName() + " (" + controller.getRegionOf(route.getCityB(), graph) + ")";
+
+                HBox row = new HBox(8);
+                row.setPadding(new Insets(3));
+
+                Label routeL = infoLabel(routeIcon(route.getAccess()) + "  " + labelA + " ↔ " + labelB);
+                HBox.setHgrow(routeL, Priority.ALWAYS);
+                row.getChildren().add(routeL);
+
+                boolean isSandbox = (graph == controller.getSandboxGraph());
+                if (isSandbox || controller.isAdmin()) {
+                    String btnText = (route.getAccess() == AccessState.BARRICATED)
+                        ? "✅ Ouvrir" : "🚧 Bloquer";
+                    Button toggleBtn = smallButton(btnText);
+                    toggleBtn.setOnAction(e -> {
+                        route.setAccess(route.getAccess() == AccessState.BARRICATED
+                            ? AccessState.OPEN : AccessState.BARRICATED);
+                        String msg = (route.getAccess() == AccessState.BARRICATED
+                            ? "🚧 Bloqué : " : "✅ Ouvert : ")
+                            + route.getCityA().getName() + " ↔ " + route.getCityB().getName();
+                        showMessage(msg);
+                        refreshPopup(regionName, region, graph);
+                        if (isSandbox) sandboxMap.draw(controller.getSandboxGraph());
+                        else           realMap.draw(controller.getNationalGraph());
+                    });
+                    row.getChildren().add(toggleBtn);
+                }
+                content.getChildren().add(row);
             }
-
-            content.getChildren().add(row);
         }
 
         return content;
+    }
+
+    /**
+     * Builds a single route row with label + toggle button.
+     * Extracted to avoid duplication between intra and inter sections.
+     */
+    private HBox buildRouteRow(Route route, String regionName, Region region, NationalGraph graph) {
+        HBox row = new HBox(8);
+        row.setPadding(new Insets(3));
+
+        Label routeL = infoLabel(routeIcon(route.getAccess()) + "  " +
+            route.getCityA().getName() + " ↔ " + route.getCityB().getName());
+        HBox.setHgrow(routeL, Priority.ALWAYS);
+        row.getChildren().add(routeL);
+
+        boolean isSandbox = (graph == controller.getSandboxGraph());
+        if (isSandbox || controller.isAdmin()) {
+            String btnText = (route.getAccess() == AccessState.BARRICATED)
+                ? "✅ Ouvrir" : "🚧 Bloquer";
+            Button toggleBtn = smallButton(btnText);
+            toggleBtn.setOnAction(e -> {
+                route.setAccess(route.getAccess() == AccessState.BARRICATED
+                    ? AccessState.OPEN : AccessState.BARRICATED);
+                refreshPopup(regionName, region, graph);
+                if (isSandbox) sandboxMap.draw(controller.getSandboxGraph());
+                else           realMap.draw(controller.getNationalGraph());
+            });
+            row.getChildren().add(toggleBtn);
+        }
+        return row;
     }
 
     // =========================================================================
@@ -822,7 +876,7 @@ public class SimulationView extends Application implements Observer {
         // chart's internal CSS (title colour, grid lines) stays intact.
         reportContent.setStyle("-fx-background-color: #1a1a2e;");
         reportContent.setPadding(new Insets(10));
-        VBox.setVgrow(chart, Priority.ALWAYS);
+        javafx.scene.layout.VBox.setVgrow(chart, javafx.scene.layout.Priority.ALWAYS);
 
         // Add or replace the "Rapport" tab in the main TabPane
         TabPane tabs = (TabPane) primaryStage.getScene().getRoot();

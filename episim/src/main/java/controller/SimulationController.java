@@ -104,6 +104,8 @@ public class SimulationController {
             region.totalInfectedGraph();
         }
 
+        // Inter-regional spread — cities in adjacent regions contaminate each other
+        engine.computeInterRegionalFlux(model.getNationalGraph(), config);
         engine.checkAndApplyBarricades(model.getNationalGraph());
         view.update();
     }
@@ -259,6 +261,83 @@ public class SimulationController {
             region.totalInfectedGraph();
             graph.addRegion(region);
         }
+        // ── Inter-regional routes ─────────────────────────────────────────────
+        // Each line connects a "gateway" city from one region to a gateway city
+        // in an adjacent region, following real French geography.
+        // Weight represents traffic intensity (higher = more travellers = faster spread).
+        // All routes start OPEN and can be barricaded by the Admin or automatically.
+        //
+        // Helper lambda to get a city object from the graph by region+city name.
+        java.util.function.BiFunction<String, String, models.entities.City> getCity =
+            (regionName, cityName) -> graph.getRegions().get(regionName)
+                                          .getRegionalGraph().getCities().get(cityName);
+
+        // Hauts-de-France ↔ Île-de-France  (Amiens → Paris, main A1 corridor)
+        graph.addInterRegionalRoute(getCity.apply("Hauts-de-France", "Amiens"),
+                                    getCity.apply("Île-de-France",   "Paris"),    2.0);
+
+        // Normandie ↔ Île-de-France  (Rouen → Paris, A13)
+        graph.addInterRegionalRoute(getCity.apply("Normandie",      "Rouen"),
+                                    getCity.apply("Île-de-France",  "Paris"),     1.5);
+
+        // Normandie ↔ Bretagne  (Caen → Rennes)
+        graph.addInterRegionalRoute(getCity.apply("Normandie",  "Caen"),
+                                    getCity.apply("Bretagne",   "Rennes"),        1.2);
+
+        // Bretagne ↔ Pays de la Loire  (Rennes → Nantes)
+        graph.addInterRegionalRoute(getCity.apply("Bretagne",         "Rennes"),
+                                    getCity.apply("Pays de la Loire", "Nantes"),  1.8);
+
+        // Pays de la Loire ↔ Centre-Val de Loire  (Angers → Tours)
+        graph.addInterRegionalRoute(getCity.apply("Pays de la Loire",    "Angers"),
+                                    getCity.apply("Centre-Val de Loire", "Tours"), 1.3);
+
+        // Centre-Val de Loire ↔ Île-de-France  (Orléans → Paris)
+        graph.addInterRegionalRoute(getCity.apply("Centre-Val de Loire", "Orléans"),
+                                    getCity.apply("Île-de-France",       "Paris"),  1.8);
+
+        // Île-de-France ↔ Grand Est  (Marne → Reims, A4)
+        graph.addInterRegionalRoute(getCity.apply("Île-de-France", "Marne"),
+                                    getCity.apply("Grand Est",     "Reims"),       1.6);
+
+        // Grand Est ↔ Bourgogne-Franche-Comté  (Belfort → Strasbourg)
+        graph.addInterRegionalRoute(getCity.apply("Grand Est",                 "Strasbourg"),
+                                    getCity.apply("Bourgogne-Franche-Comté",   "Belfort"),  1.1);
+
+        // Bourgogne-Franche-Comté ↔ Auvergne-Rhône-Alpes  (Dijon → Lyon)
+        graph.addInterRegionalRoute(getCity.apply("Bourgogne-Franche-Comté", "Dijon"),
+                                    getCity.apply("Auvergne-Rhône-Alpes",    "Lyon"),  1.7);
+
+        // Auvergne-Rhône-Alpes ↔ PACA  (Grenoble → Marseille via A51)
+        graph.addInterRegionalRoute(getCity.apply("Auvergne-Rhône-Alpes", "Grenoble"),
+                                    getCity.apply("PACA",                  "Marseille"), 1.4);
+
+        // PACA ↔ Occitanie  (Avignon → Nîmes, A9)
+        graph.addInterRegionalRoute(getCity.apply("PACA",      "Avignon"),
+                                    getCity.apply("Occitanie", "Nîmes"),              1.5);
+
+        // Occitanie ↔ Nouvelle-Aquitaine  (Toulouse → Bordeaux, A62)
+        graph.addInterRegionalRoute(getCity.apply("Occitanie",          "Toulouse"),
+                                    getCity.apply("Nouvelle-Aquitaine", "Bordeaux"),  1.6);
+
+        // Nouvelle-Aquitaine ↔ Centre-Val de Loire  (Poitiers → Tours, A10)
+        graph.addInterRegionalRoute(getCity.apply("Nouvelle-Aquitaine",   "Poitiers"),
+                                    getCity.apply("Centre-Val de Loire",  "Tours"),   1.3);
+
+        // Nouvelle-Aquitaine ↔ Auvergne-Rhône-Alpes  (Limoges → Clermont, A89)
+        graph.addInterRegionalRoute(getCity.apply("Nouvelle-Aquitaine",    "Limoges"),
+                                    getCity.apply("Auvergne-Rhône-Alpes", "Clermont"), 1.0);
+
+        // Centre-Val de Loire ↔ Bourgogne-Franche-Comté  (Bourges → Dijon)
+        graph.addInterRegionalRoute(getCity.apply("Centre-Val de Loire",   "Bourges"),
+                                    getCity.apply("Bourgogne-Franche-Comté", "Dijon"), 1.0);
+
+        // Auvergne-Rhône-Alpes ↔ Occitanie  (Clermont → Montpellier, A75)
+        graph.addInterRegionalRoute(getCity.apply("Auvergne-Rhône-Alpes", "Clermont"),
+                                    getCity.apply("Occitanie",             "Montpellier"), 1.2);
+
+        // Corse is isolated — no inter-regional routes (island)
+
         return graph;
     }
 
@@ -314,6 +393,7 @@ public class SimulationController {
             engine.computeInterCityFlux(region, config);
             region.totalInfectedGraph();
         }
+        engine.computeInterRegionalFlux(getSandboxGraph(), config);
         engine.checkAndApplyBarricades(getSandboxGraph());
     }
 
@@ -489,4 +569,62 @@ public class SimulationController {
             result.put(name, new int[]{before, after});
         }
         return result;
+    }
+
+    // =========================================================================
+    // Inter-regional route helpers — used by the region popup in the view
+    // =========================================================================
+
+    /**
+     * Returns all inter-regional routes that involve at least one city
+     * belonging to the given region.
+     *
+     * The view calls this to populate the "Routes inter-régionales" section
+     * of the region popup, showing only the routes relevant to that region.
+     *
+     * @param regionName the region whose inter-regional routes we want
+     * @param graph      the NationalGraph to query (real or sandbox)
+     * @return list of matching inter-regional routes (may be empty)
+     */
+    public java.util.List<models.entities.Route> getInterRegionalRoutesFor(
+            String regionName, models.graph.NationalGraph graph) {
+
+        java.util.List<models.entities.Route> result = new java.util.ArrayList<>();
+        models.entities.Region region = graph.getRegions().get(regionName);
+        if (region == null) return result;
+
+        // Collect city names that belong to this region for fast lookup
+        java.util.Set<String> cityNames =
+            region.getRegionalGraph().getCities().keySet();
+
+        for (models.entities.Route route : graph.getInterRegionalRoutes()) {
+            boolean aInRegion = cityNames.contains(route.getCityA().getName());
+            boolean bInRegion = cityNames.contains(route.getCityB().getName());
+            // Include if at least one endpoint is in this region
+            if (aInRegion || bInRegion) {
+                result.add(route);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns the name of the region that contains the given city.
+     * Used by the popup to label inter-regional routes as
+     * "Paris (Île-de-France) ↔ Amiens (Hauts-de-France)".
+     *
+     * @param city  the city to look up
+     * @param graph the NationalGraph to search
+     * @return region name, or "?" if not found
+     */
+    public String getRegionOf(models.entities.City city,
+                              models.graph.NationalGraph graph) {
+        for (java.util.Map.Entry<String, models.entities.Region> entry
+                : graph.getRegions().entrySet()) {
+            if (entry.getValue().getRegionalGraph()
+                     .getCities().containsKey(city.getName())) {
+                return entry.getKey();
+            }
+        }
+        return "?";
     }}
