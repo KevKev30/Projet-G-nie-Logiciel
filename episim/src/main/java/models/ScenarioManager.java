@@ -78,9 +78,11 @@ public class ScenarioManager {
         City  targetCity   = allCities.get(chosenIndex);
         Region targetRegion = allRegions.get(chosenIndex);
 
-        // Seed: between 0.05% and 0.3% of safe population, minimum 1
-        double fraction = 0.0005 + random.nextDouble() * 0.0025;
-        int outbreak = Math.max(1, (int) (targetCity.getSafe() * fraction));
+        // Seed: between 1% and 5% of safe population, minimum 50 cases.
+        // With populations of 20k-120k this gives 200-6000 cases per event
+        // — visible immediately on the map colour.
+        double fraction = 0.01 + random.nextDouble() * 0.04;
+        int outbreak = Math.max(50, (int) (targetCity.getSafe() * fraction));
         if (outbreak > targetCity.getSafe()) outbreak = targetCity.getSafe();
 
         targetCity.setSafe(targetCity.getSafe() - outbreak);

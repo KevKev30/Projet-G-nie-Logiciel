@@ -1,25 +1,17 @@
 package view;
 
 import controller.SimulationController;
+import exceptions.CityStateException;
+import exceptions.InvalidParameterException;
 import exceptions.SimulationSaveException;
 import interfaces.Observer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Priority;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Separator;
-import javafx.scene.control.Slider;
-import javafx.scene.control.Spinner;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Modality;
@@ -29,6 +21,9 @@ import models.entities.Region;
 import models.entities.Route;
 import models.graph.NationalGraph;
 import models.types.AccessState;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Main JavaFX view — Epidemic Simulation.
@@ -167,10 +162,15 @@ public class SimulationView extends Application implements Observer {
         infoLbl.setFont(Font.font(11));
         infoLbl.setWrapText(true);
 
-        // Save button — identical to the one in the Simulateur tab
+        // Save button
         Button btnSave = actionButton("💾 Sauvegarder");
         btnSave.setMaxWidth(Double.MAX_VALUE);
         btnSave.setOnAction(e -> handleSave());
+
+        // Load button — lists files from saves/ and lets the user pick one
+        Button btnLoad = actionButton("📂 Charger");
+        btnLoad.setMaxWidth(Double.MAX_VALUE);
+        btnLoad.setOnAction(e -> handleLoad());
 
         panel.getChildren().addAll(
             sectionLabel("Utilisateur"),
@@ -180,7 +180,8 @@ public class SimulationView extends Application implements Observer {
             new Separator(),
             infoLbl,
             new Separator(),
-            btnSave
+            btnSave,
+            btnLoad
         );
         return panel;
     }
@@ -270,10 +271,15 @@ public class SimulationView extends Application implements Observer {
             showSandboxMessage("Sandbox réinitialisée.");
         });
 
-        // Save — same behaviour as the real tab save button
+        // Save
         Button btnSave = actionButton("💾 Sauvegarder");
         btnSave.setMaxWidth(Double.MAX_VALUE);
         btnSave.setOnAction(e -> handleSave());
+
+        // Load — same file list, loads into real graph and resets sandbox
+        Button btnLoad = actionButton("📂 Charger");
+        btnLoad.setMaxWidth(Double.MAX_VALUE);
+        btnLoad.setOnAction(e -> handleLoad());
 
         // Generate report — takes a snapshot of the current sandbox state,
         // compares it to the initial state (captured at sandbox creation),
@@ -367,6 +373,13 @@ public class SimulationView extends Application implements Observer {
             if (!nowRunning) sandboxStepLabel.setText(sandboxTimerText());
         });
 
+        // ── Test button (admin only) ─────────────────────────────────────────
+        // Visible only to admin users. Forces exception scenarios that cannot
+        // be reached through the normal UI (spinner minimum = 1, etc.).
+        // Each button triggers one specific exception so we can demonstrate
+        // the error handling live during the presentation.
+        VBox testBox = buildTestPanel(regionCombo, cityCombo);
+
         panel.getChildren().addAll(
             sectionLabel("🧪 Simulateur"),
             sandboxStepLabel,
@@ -380,6 +393,7 @@ public class SimulationView extends Application implements Observer {
             btnRandom,
             btnReset,
             btnSave,
+            btnLoad,
             btnReport,
             new Separator(),
             formTitle,
@@ -389,9 +403,153 @@ public class SimulationView extends Application implements Observer {
             btnInject,
             new javafx.scene.control.Separator(),
             sectionLabel("📋 Historique"),
-            buildHistoryBox()
+            buildHistoryBox(),
+            new javafx.scene.control.Separator(),
+            testBox
         );
         return panel;
+    }
+
+    // =========================================================================
+    // Test panel — forces exception scenarios for demonstration
+    // =========================================================================
+
+    /**
+     * Builds a collapsible test panel visible only to admin users.
+     * Each button forces a specific exception that the normal UI cannot trigger,
+     * so we can demonstrate exception handling during a presentation.
+     *
+     * The panel is a VBox initially hidden; a toggle button reveals it.
+     * Passing regionCombo and cityCombo lets us reuse the user's current
+     * selection as target for the injection tests.
+     *
+     * @param regionCombo the region selector from the sandbox panel
+     * @param cityCombo   the city selector from the sandbox panel
+     */
+    private VBox buildTestPanel(
+            javafx.scene.control.ComboBox<String> regionCombo,
+            javafx.scene.control.ComboBox<String> cityCombo) {
+
+        // The inner content — hidden by default
+        VBox testContent = new VBox(6);
+        testContent.setStyle(
+            "-fx-background-color: #1a0a2e;" +
+            "-fx-background-radius: 4;" +
+            "-fx-padding: 6;"
+        );
+        testContent.setVisible(false);
+        testContent.setManaged(false);
+
+        // Toggle button to show/hide the test panel
+        Button btnToggle = new Button("🔬 Tests exceptions");
+        btnToggle.setMaxWidth(Double.MAX_VALUE);
+        btnToggle.setStyle(
+            "-fx-background-color: #4a1060; -fx-text-fill: white;" +
+            "-fx-background-radius: 5; -fx-cursor: hand; -fx-font-size: 10;"
+        );
+        btnToggle.setOnAction(e -> {
+            boolean nowVisible = !testContent.isVisible();
+            testContent.setVisible(nowVisible);
+            testContent.setManaged(nowVisible);
+            btnToggle.setText(nowVisible ? "🔬 Masquer les tests" : "🔬 Tests exceptions");
+        });
+
+        // ── Test 1 : InvalidParameterException — count = 0 ───────────────────
+        // The spinner minimum is 1 so this is unreachable via normal UI.
+        Label lbl1 = infoLabel("① count = 0 → InvalidParameterException");
+        Button btn1 = testButton("Lancer ①");
+        btn1.setOnAction(e -> {
+            String region = regionCombo.getValue();
+            String city   = cityCombo.getValue();
+            if (region == null || city == null) {
+                showSandboxMessage("⚠ Sélectionne d'abord une région et une ville.");
+                return;
+            }
+            try {
+                controller.sandboxInject(region, city, 0); // count=0 → exception
+            } catch (exceptions.InvalidParameterException ex) {
+                showSandboxMessage("✅ InvalidParameterException attrapee : " + ex.getMessage() + " | Param: " + ex.getParameterName() + " | Valeur: " + ex.getOffendingValue());
+            }
+        });
+
+        // ── Test 2 : InvalidParameterException — regionName vide ─────────────
+        Label lbl2 = infoLabel("② regionName vide → InvalidParameterException");
+        Button btn2 = testButton("Lancer ②");
+        btn2.setOnAction(e -> {
+            try {
+                controller.sandboxInject("", "Paris", 10); // blank region → exception
+            } catch (exceptions.InvalidParameterException ex) {
+                showSandboxMessage("✅ InvalidParameterException attrapee : " + ex.getMessage());
+            }
+        });
+
+        // ── Test 3 : CityStateException — population saine épuisée ───────────
+        // Inject the entire safe population of a city, then inject again.
+        Label lbl3 = infoLabel("③ Ville sans sains → CityStateException");
+        Button btn3 = testButton("Lancer ③");
+        btn3.setOnAction(e -> {
+            String region = regionCombo.getValue();
+            String city   = cityCombo.getValue();
+            if (region == null || city == null) {
+                showSandboxMessage("⚠ Sélectionne d'abord une région et une ville.");
+                return;
+            }
+            try {
+                // First: drain all safe population
+                models.entities.Region r = controller.getSandboxGraph()
+                    .getRegions().get(region);
+                if (r == null) return;
+                models.entities.City c = r.getRegionalGraph()
+                    .getCities().get(city);
+                if (c == null) return;
+                // Inject exactly all safe people → city.safe becomes 0
+                controller.sandboxInject(region, city, c.getSafe());
+                sandboxMap.draw(controller.getSandboxGraph());
+                // Second injection → CityStateException
+                controller.sandboxInject(region, city, 1);
+            } catch (exceptions.CityStateException ex) {
+                showSandboxMessage("✅ CityStateException attrapee : " + ex.getMessage() + " | Ville: " + ex.getCityName());
+            } catch (exceptions.InvalidParameterException ex) {
+                showSandboxMessage("⚠ " + ex.getMessage());
+            }
+        });
+
+        // ── Test 4 : InvalidParameterException — vitesse hors limites ─────────
+        // The speed slider is capped at 10 so 999 is unreachable via UI.
+        Label lbl4 = infoLabel("④ speed=999 → InvalidParameterException");
+        Button btn4 = testButton("Lancer ④");
+        btn4.setOnAction(e -> {
+            try {
+                controller.changeSpeed(999);
+            } catch (exceptions.InvalidParameterException ex) {
+                showSandboxMessage("✅ InvalidParameterException attrapee : " + ex.getMessage() + " | Param: " + ex.getParameterName() + " | Valeur: " + ex.getOffendingValue());
+            }
+        });
+
+        testContent.getChildren().addAll(lbl1, btn1, lbl2, btn2, lbl3, btn3, lbl4, btn4);
+
+        VBox wrapper = new VBox(4, btnToggle, testContent);
+        // Hide the entire test panel for non-admin users
+        wrapper.visibleProperty().bind(
+            javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> controller.isAdmin(),
+                // Recheck when userLabel changes (proxy for role change)
+                userLabel.textProperty()
+            )
+        );
+        wrapper.managedProperty().bind(wrapper.visibleProperty());
+        return wrapper;
+    }
+
+    /** Small styled button for test actions. */
+    private Button testButton(String text) {
+        Button b = new Button(text);
+        b.setMaxWidth(Double.MAX_VALUE);
+        b.setStyle(
+            "-fx-background-color: #2a1040; -fx-text-fill: #cc99ff;" +
+            "-fx-background-radius: 4; -fx-cursor: hand; -fx-font-size: 10;"
+        );
+        return b;
     }
 
     // =========================================================================
@@ -748,156 +906,150 @@ public class SimulationView extends Application implements Observer {
     // =========================================================================
 
     // =========================================================================
-    // Report — Before / After BarChart
+    // Report — Before / After chart drawn on Canvas (no javafx-charts needed)
     // =========================================================================
 
     /**
      * Generates a "Before / After" report for all regions.
      *
-     * "Before" = the snapshot taken when the sandbox was first created
-     *            (a deep copy of the real graph at that moment).
-     * "After"  = the current state of the sandbox graph right now.
+     * Drawn on a plain JavaFX Canvas using GraphicsContext — no javafx-charts
+     * dependency required.  Each region gets two bars side by side:
+     *   Blue  = infected before simulation
+     *   Red   = infected after simulation
      *
-     * The report is a JavaFX BarChart displayed in a new tab called "📈 Rapport".
-     * If a report tab already exists it is replaced so we always show fresh data.
-     *
-     * Chart structure:
-     *   X axis : region names (shortened to first word)
-     *   Y axis : number of infected cases
-     *   Two bar series : "Avant simulation" and "Après simulation"
+     * "Before" = snapshot at first sandbox step.
+     * "After"  = current sandbox state.
      */
     private void generateReport() {
-        // Collect before/after data from the controller
         java.util.Map<String, int[]> data = controller.getSandboxBeforeAfter();
         if (data.isEmpty()) {
             showSandboxMessage("⚠ Lancez au moins un step avant de générer le rapport.");
             return;
         }
 
-        // Build X axis with region names (short form for readability)
-        javafx.scene.chart.CategoryAxis xAxis = new javafx.scene.chart.CategoryAxis();
-        xAxis.setLabel("Région");
+        // ── Canvas dimensions ─────────────────────────────────────────────────
+        int regions    = data.size();
+        int canvasW    = Math.max(900, regions * 80 + 80);
+        int canvasH    = 420;
+        int marginL    = 70;   // left margin for Y axis labels
+        int marginB    = 60;   // bottom margin for X axis labels
+        int marginT    = 50;   // top margin for title
+        int plotW      = canvasW - marginL - 20;
+        int plotH      = canvasH - marginT - marginB;
 
-        // Build Y axis
-        javafx.scene.chart.NumberAxis yAxis = new javafx.scene.chart.NumberAxis();
-        yAxis.setLabel("Cas infectés");
+        javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(canvasW, canvasH);
+        javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
 
-        // ── BarChart setup ────────────────────────────────────────────────────
-        javafx.scene.chart.BarChart<String, Number> chart =
-            new javafx.scene.chart.BarChart<>(xAxis, yAxis);
-        chart.setTitle("Impact de la simulation – Avant / Après");
-        chart.setAnimated(false);
+        // Background
+        gc.setFill(Color.web("#1a1a2e"));
+        gc.fillRect(0, 0, canvasW, canvasH);
 
-        // FIX (title invisible): do NOT override -fx-background-color at chart
-        // level — that CSS property also controls the title text colour via the
-        // internal chart stylesheet.  Instead, set the background on the parent
-        // VBox only and leave the chart's own CSS intact.
-        // We only change what we need: the plot background and text colours.
-        chart.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-title-font-size: 16px;"
-        );
-        chart.lookup(".chart-title") ; // resolved after scene attachment
+        // Title
+        gc.setFill(Color.WHITE);
+        gc.setFont(Font.font(16));
+        gc.fillText("Impact de la simulation - Avant / Après", marginL, 30);
 
-        // ── Series definition ─────────────────────────────────────────────────
-        // Avant = blue (#1565c0), Après = red (#c62828)
-        // We set the colour via the series node's -fx-bar-fill AFTER the chart
-        // is attached to the scene.  Using the series legend symbol CSS class
-        // ensures the legend square matches the bar colour.
-        javafx.scene.chart.XYChart.Series<String, Number> seriesBefore =
-            new javafx.scene.chart.XYChart.Series<>();
-        seriesBefore.setName("Avant simulation");
+        // Find max value for Y scale
+        int maxVal = 1;
+        for (int[] v : data.values()) {
+            maxVal = Math.max(maxVal, Math.max(v[0], v[1]));
+        }
+        // Round up to a nice number
+        int yMax = (int)(Math.ceil(maxVal / 1000.0) * 1000);
 
-        javafx.scene.chart.XYChart.Series<String, Number> seriesAfter =
-            new javafx.scene.chart.XYChart.Series<>();
-        seriesAfter.setName("Après simulation");
-
-        // Populate one bar pair per region
-        for (java.util.Map.Entry<String, int[]> entry : data.entrySet()) {
-            String shortName = entry.getKey().split("[ -]")[0];
-            int before = entry.getValue()[0];
-            int after  = entry.getValue()[1];
-            seriesBefore.getData().add(
-                new javafx.scene.chart.XYChart.Data<>(shortName, before)
-            );
-            seriesAfter.getData().add(
-                new javafx.scene.chart.XYChart.Data<>(shortName, after)
-            );
+        // Draw Y axis grid lines and labels
+        gc.setFont(Font.font(10));
+        int ySteps = 5;
+        for (int i = 0; i <= ySteps; i++) {
+            int val  = yMax * i / ySteps;
+            int yPix = canvasH - marginB - (plotH * i / ySteps);
+            gc.setStroke(Color.web("#333355"));
+            gc.setLineWidth(0.5);
+            gc.strokeLine(marginL, yPix, canvasW - 20, yPix);
+            gc.setFill(Color.LIGHTGRAY);
+            gc.fillText(String.valueOf(val), 2, yPix + 4);
         }
 
-        chart.getData().addAll(seriesBefore, seriesAfter);
+        // Draw X axis line
+        gc.setStroke(Color.LIGHTGRAY);
+        gc.setLineWidth(1);
+        gc.strokeLine(marginL, canvasH - marginB, canvasW - 20, canvasH - marginB);
 
-        // FIX (wrong colours + legend mismatch):
-        // JavaFX assigns default CSS colour classes (default-color0, default-color1…)
-        // to each series in insertion order.  Overriding -fx-bar-fill per data node
-        // via Platform.runLater is unreliable because the nodes may not exist yet.
-        //
-        // The reliable approach is to style the series node directly, which covers
-        // BOTH the bars AND the legend symbol via the .chart-series-bar selector.
-        //
-        // We use a scene-change listener so the CSS is applied the moment the
-        // chart is actually attached to the scene graph (guaranteed timing).
-        chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene == null) return;
-            // Give JavaFX one pulse to lay out the chart nodes
-            javafx.application.Platform.runLater(() -> {
-                // Style every bar in seriesBefore → blue
-                for (javafx.scene.chart.XYChart.Data<String, Number> d : seriesBefore.getData()) {
-                    if (d.getNode() != null)
-                        d.getNode().setStyle("-fx-bar-fill: #1565c0;");
-                }
-                // Style every bar in seriesAfter → red
-                for (javafx.scene.chart.XYChart.Data<String, Number> d : seriesAfter.getData()) {
-                    if (d.getNode() != null)
-                        d.getNode().setStyle("-fx-bar-fill: #c62828;");
-                }
-                // Style legend symbols to match — lookup returns all nodes
-                // with the class .chart-legend-item-symbol for each series
-                javafx.scene.Node legendBefore = chart.lookup(".default-color0.chart-legend-item-symbol");
-                javafx.scene.Node legendAfter  = chart.lookup(".default-color1.chart-legend-item-symbol");
-                if (legendBefore != null) legendBefore.setStyle("-fx-background-color: #1565c0;");
-                if (legendAfter  != null) legendAfter.setStyle( "-fx-background-color: #c62828;");
+        // Draw bars — two per region (before=blue, after=red)
+        int groupW   = plotW / regions;   // width allocated per region
+        int barW     = Math.max(6, groupW / 3);  // width of each individual bar
+        int gap      = 2;
+        int idx      = 0;
 
-                // FIX (title colour): lookup the title label after scene attach
-                javafx.scene.Node titleNode = chart.lookup(".chart-title");
-                if (titleNode != null)
-                    titleNode.setStyle("-fx-text-fill: white; -fx-font-size: 16px;");
+        for (java.util.Map.Entry<String, int[]> entry : data.entrySet()) {
+            int before   = entry.getValue()[0];
+            int after    = entry.getValue()[1];
+            String label = entry.getKey().split("[ -]")[0];
 
-                // Axis labels white
-                javafx.scene.Node xLabel = chart.lookup(".axis-label");
-                if (xLabel != null) xLabel.setStyle("-fx-text-fill: white;");
-            });
-        });
+            int groupX  = marginL + idx * groupW;
+            int centerX = groupX + groupW / 2;
 
-        // Summary label: total infected delta
+            // Before bar (blue)
+            int beforeH = (int)((double) before / yMax * plotH);
+            int beforeY = canvasH - marginB - beforeH;
+            gc.setFill(Color.web("#1565c0", 0.85));
+            gc.fillRect(centerX - barW - gap, beforeY, barW, beforeH);
+
+            // After bar (red)
+            int afterH  = (int)((double) after / yMax * plotH);
+            int afterY  = canvasH - marginB - afterH;
+            gc.setFill(Color.web("#c62828", 0.85));
+            gc.fillRect(centerX + gap, afterY, barW, afterH);
+
+            // Region label on X axis
+            gc.setFill(Color.LIGHTGRAY);
+            gc.setFont(Font.font(9));
+            gc.fillText(label, centerX - barW, canvasH - marginB + 14);
+
+            idx++;
+        }
+
+        // Legend
+        gc.setFill(Color.web("#1565c0"));
+        gc.fillRect(marginL, canvasH - marginB + 30, 14, 10);
+        gc.setFill(Color.LIGHTGRAY);
+        gc.setFont(Font.font(11));
+        gc.fillText("Avant simulation", marginL + 18, canvasH - marginB + 40);
+
+        gc.setFill(Color.web("#c62828"));
+        gc.fillRect(marginL + 160, canvasH - marginB + 30, 14, 10);
+        gc.setFill(Color.LIGHTGRAY);
+        gc.fillText("Après simulation", marginL + 178, canvasH - marginB + 40);
+
+        // ── Summary label ─────────────────────────────────────────────────────
         int totalBefore = data.values().stream().mapToInt(arr -> arr[0]).sum();
         int totalAfter  = data.values().stream().mapToInt(arr -> arr[1]).sum();
         int delta       = totalAfter - totalBefore;
         String deltaText = (delta >= 0 ? "+" : "") + delta;
 
         Label summary = new Label(
-            "Résumé : " + totalBefore + " infectés au départ → " +
-            totalAfter + " après simulation  (Δ " + deltaText + ")" +
+            "Résumé : " + totalBefore + " infectés au départ -> " +
+            totalAfter + " après simulation  (D " + deltaText + ")" +
             "   |   Durée simulée : " + controller.getSandboxStep() + " jours"
         );
         summary.setTextFill(Color.WHITE);
         summary.setFont(Font.font(13));
         summary.setPadding(new Insets(10));
 
-        VBox reportContent = new VBox(10, summary, chart);
-        // Background set on the container, NOT on the chart, so the
-        // chart's internal CSS (title colour, grid lines) stays intact.
+        javafx.scene.control.ScrollPane scrollChart = new javafx.scene.control.ScrollPane(canvas);
+        scrollChart.setStyle("-fx-background: #1a1a2e; -fx-background-color: #1a1a2e;");
+        scrollChart.setFitToHeight(true);
+
+        VBox reportContent = new VBox(10, summary, scrollChart);
         reportContent.setStyle("-fx-background-color: #1a1a2e;");
         reportContent.setPadding(new Insets(10));
-        VBox.setVgrow(chart, Priority.ALWAYS);
+        VBox.setVgrow(scrollChart, Priority.ALWAYS);
 
-        // Add or replace the "Rapport" tab in the main TabPane
+        // Add or replace the "Rapport" tab
         TabPane tabs = (TabPane) primaryStage.getScene().getRoot();
         tabs.getTabs().removeIf(t -> t.getText().contains("Rapport"));
         Tab reportTab = new Tab("📈 Rapport", reportContent);
         tabs.getTabs().add(reportTab);
-
-        // Switch to the new tab automatically
         tabs.getSelectionModel().select(reportTab);
         showSandboxMessage("📊 Rapport généré pour " + data.size() + " régions.");
     }
@@ -912,16 +1064,68 @@ public class SimulationView extends Application implements Observer {
      * @throws SimulationSaveException if the save directory cannot be created
      *                                 or the file cannot be written
      */
+    /**
+     * Shows a ChoiceDialog listing all .json files from the saves/ directory,
+     * most recent first.  The user picks one and the simulation is loaded.
+     *
+     * Using a ChoiceDialog instead of a FileChooser keeps the user inside
+     * the saves/ folder — no browsing required.
+     */
+    private void handleLoad() {
+        if (!controller.isAdmin()) {
+            showMessage("⚠ Chargement réservé a l'Admin.");
+            showSandboxMessage("⚠ Chargement réservé a l'Admin.");
+            return;
+        }
+        List<String> files = controller.listSaveFiles();
+        if (files.isEmpty()) {
+            showMessage("⚠ Aucune sauvegarde trouvée dans saves/");
+            return;
+        }
+
+        // ChoiceDialog presents a dropdown with all available saves
+        javafx.scene.control.ChoiceDialog<String> dialog =
+            new javafx.scene.control.ChoiceDialog<>(files.get(0), files);
+        dialog.setTitle("Charger une simulation");
+        dialog.setHeaderText("Sauvegardes disponibles (plus récente en premier)");
+        dialog.setContentText("Fichier :");
+
+        dialog.showAndWait().ifPresent(chosen -> {
+            try {
+                controller.loadSimulation(chosen);
+                // Redraw both maps with the newly loaded data
+                realMap.draw(controller.getNationalGraph());
+                sandboxMap.draw(controller.getSandboxGraph());
+                showMessage("📂 Chargé : " + chosen);
+            } catch (exceptions.SimulationSaveException ex) {
+                showMessage("⚠ Erreur de chargement : " + ex.getMessage());
+                System.err.println("[LOAD] " + ex.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Saves the simulation to saves/ directory.
+     * Shows the result in both message labels (real + sandbox) so it is
+     * always visible regardless of which tab the user is on.
+     *
+     * NOTE: isAdmin() reads the model's current user — make sure you have
+     * clicked "Admin" before saving.  The user role persists across tabs.
+     */
     private void handleSave() {
         if (!controller.isAdmin()) {
-            showMessage("⚠ Sauvegarde réservée à l'Admin.");
+            // Show in both panels so the message is never hidden by tab
+            showMessage("⚠ Sauvegarde réservée a l'Admin.");
+            showSandboxMessage("⚠ Sauvegarde réservée a l'Admin.");
             return;
         }
         try {
             controller.saveSimulation();
-            showMessage("💾 Simulation sauvegardée dans le dossier saves/");
+            showMessage("💾 Sauvegarde OK dans saves/");
+            showSandboxMessage("💾 Sauvegarde OK dans saves/");
         } catch (SimulationSaveException e) {
-            showMessage("⚠ Erreur de sauvegarde : " + e.getMessage());
+            showMessage("⚠ Erreur : " + e.getMessage());
+            showSandboxMessage("⚠ Erreur : " + e.getMessage());
             System.err.println("[SAVE] " + e.getMessage());
         }
     }
